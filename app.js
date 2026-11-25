@@ -464,6 +464,202 @@
     "<div class='ed-cause'><b>" + d.model + "</b> — " + d.length + " long · " + d.wheelbase + " wheelbase · " + d.saddle + " saddle · " + d.height + " high · " + d.dry + " dry · " + d.gvwr + " GVWR</div>").join("") +
     "<p class='ed-note'>Source: " + D.torque.source + "</p>";
 
+  /* ---------- shop tab: plug reader, wire/fuse, gear ratio, tap & drill,
+     bolt ID, oil, compression ratio, carb CFM, sag, interchange, pre-ride.
+     All reference numbers live in ED_DATA.shop; all math in ED_Shop. --- */
+  const SH = D.shop;
+  /* 1. Plug reader */
+  $("plug-reader").innerHTML =
+    "<p>Stock plug: <b>" + SH.plug_reader.plug + "</b>, gap <b>" + SH.plug_reader.gap + "</b> in. <span class='ed-note'>(" + SH.plug_reader.ref + ")</span></p>" +
+    SH.plug_reader.conditions.map((c) =>
+      "<div class='ed-cause'><b>" + c.name + "</b> — " + c.look +
+      "<br>Cause: " + c.cause +
+      "<br>Action: " + c.action +
+      (c.see ? "<br><span class='ed-note'>Next: " + c.see + "</span>" : "") + "</div>").join("") +
+    SH.plug_reader.notes.map((n) => "<p class='ed-note'>" + n + "</p>").join("");
+  /* 2. Wire & breaker */
+  $("wire-fuse").innerHTML =
+    "<h4>Circuit breakers <span class='ed-note'>(FSM §8 p. 8-1)</span></h4>" +
+    SH.wire_fuse.breakers.map((b) => "<div class='ed-cause'><b>" + b.circuit + "</b> — " + b.amps + " A</div>").join("") +
+    "<h4>Wire gauge by circuit <span class='ed-note'>(1997 Main Harness, App. A Table 2)</span></h4>" +
+    SH.wire_fuse.wires.map((w) => "<div class='ed-cause'><b>" + w.circuit + "</b> — " + w.gauge + " GA</div>").join("") +
+    SH.wire_fuse.notes.map((n) => "<p class='ed-note'>" + n + "</p>").join("") +
+    "<p class='ed-note'>Source: " + SH.wire_fuse.ref + "</p>";
+  /* 3. Gear ratio calculator */
+  $("gear-ratio").innerHTML =
+    "<label for='gr-comp'>Engine (compensating) sprocket teeth</label><input type='text' id='gr-comp' inputmode='numeric' value='25'>" +
+    "<label for='gr-clutch'>Clutch sprocket teeth</label><input type='text' id='gr-clutch' inputmode='numeric' value='36'>" +
+    "<label for='gr-trans'>Transmission sprocket teeth</label><input type='text' id='gr-trans' inputmode='numeric' value='32'>" +
+    "<label for='gr-rear'>Rear wheel sprocket teeth</label><input type='text' id='gr-rear' inputmode='numeric' value='65'>" +
+    "<label for='gr-years'>Internal gear ratios (Clymer Table 1)</label><select id='gr-years'>" +
+    SH.gear_ratio.internal.map((y, i) => "<option value='" + i + "'>" + y.years + "</option>").join("") + "</select>" +
+    "<label for='gr-gear'>Gear</label><select id='gr-gear'><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select>" +
+    "<label for='gr-tire'>Rear tire diameter, inches</label><input type='text' id='gr-tire' inputmode='decimal' value='25.21'>" +
+    "<p class='ed-note'>Presets (computed from the published sizes): " + SH.gear_ratio.tire_presets.map((t) => t.label + " = " + t.dia_in + " in").join("; ") + ". " + SH.gear_ratio.tire_note + "</p>" +
+    "<label for='gr-speed'>Speed, mph</label><input type='text' id='gr-speed' inputmode='numeric' value='60'>" +
+    "<label for='gr-rpm'>Engine rpm</label><input type='text' id='gr-rpm' inputmode='numeric' value='3000'>" +
+    "<div id='gr-result'></div>" +
+    "<h4>Stock overall gear ratios <span class='ed-note'>(engine revs per one rear-wheel rev)</span></h4>" +
+    SH.gear_ratio.overall.map((o) => "<p><b>" + o.years + ":</b> " + o.gears.map((g, i) => (i + 1) + ": " + g.toFixed(2)).join(" · ") + "</p>").join("") +
+    "<p class='ed-note'>Source: " + SH.gear_ratio.ref + "</p>" +
+    "<p class='ed-note'><b>Book contradiction — read this:</b> " + SH.gear_ratio.flag + "</p>";
+  function renderGear() {
+    const comp = parseFloat($("gr-comp").value), clutch = parseFloat($("gr-clutch").value);
+    const trans = parseFloat($("gr-trans").value), rear = parseFloat($("gr-rear").value);
+    const gearIdx = parseInt($("gr-gear").value, 10) - 1;
+    const yearSet = SH.gear_ratio.internal[parseInt($("gr-years").value, 10)];
+    const tire = parseFloat($("gr-tire").value);
+    const mph = parseFloat($("gr-speed").value), rpm = parseFloat($("gr-rpm").value);
+    const primary = ED_Shop.primaryRatio(comp, clutch);
+    const fin = ED_Shop.finalRatio(trans, rear);
+    const internal = yearSet ? yearSet.gears[gearIdx] : null;
+    const overall = ED_Shop.overallRatio(primary, internal, fin);
+    const rpmAt = ED_Shop.rpmAtSpeed(mph, overall, tire);
+    const mphAt = ED_Shop.speedAtRpm(rpm, overall, tire);
+    $("gr-result").innerHTML = (primary === null || fin === null || internal === null || overall === null)
+      ? "<p>Enter all four sprocket counts to see the ratios.</p>"
+      : "<div class='ed-cause'><b>Primary</b> " + clutch + "/" + comp + " = " + primary.toFixed(2) + " : 1" +
+        "<br><b>Final drive</b> " + rear + "/" + trans + " = " + fin.toFixed(3) + " : 1" +
+        "<br><b>" + yearSet.years + " gear " + (gearIdx + 1) + "</b> = " + internal.toFixed(2) + " : 1" +
+        "<br><b>Overall</b> = " + overall.toFixed(3) + " : 1 (engine revs per wheel rev)" +
+        (rpmAt !== null ? "<br><b>" + mph + " mph in gear " + (gearIdx + 1) + " = " + rpmAt + " rpm</b>" : "") +
+        (mphAt !== null ? "<br><b>" + rpm + " rpm in gear " + (gearIdx + 1) + " = " + mphAt + " mph</b>" : "") + "</div>";
+  }
+  ["gr-comp", "gr-clutch", "gr-trans", "gr-rear", "gr-years", "gr-gear", "gr-tire", "gr-speed", "gr-rpm"].forEach((id) =>
+    $(id).addEventListener("input", renderGear));
+  renderGear();
+  /* 4. Tap & drill */
+  $("tap-drill").innerHTML =
+    "<label for='td-inch'>Inch thread</label><select id='td-inch'>" +
+    SH.tap_drill.inch.map((r) => "<option>" + r.thread + "</option>").join("") + "</select>" +
+    "<p id='td-inch-out'></p>" +
+    "<label for='td-metric'>Metric thread</label><select id='td-metric'>" +
+    SH.tap_drill.metric.map((r) => "<option>" + r.thread + "</option>").join("") + "</select>" +
+    "<p id='td-metric-out'></p>" +
+    "<h4>Inch — full table</h4>" +
+    SH.tap_drill.inch.map((r) => "<div class='ed-cause'><b>" + r.thread + "</b> — drill " + r.drill + "</div>").join("") +
+    "<h4>Metric — full table</h4>" +
+    SH.tap_drill.metric.map((r) => "<div class='ed-cause'><b>M" + r.thread + "</b> — drill " + r.drill + " (" + r.decimal + " in, nearest " + r.fraction + ")</div>").join("") +
+    SH.tap_drill.notes.map((n) => "<p class='ed-note'>" + n + "</p>").join("") +
+    "<p class='ed-note'>Source: " + SH.tap_drill.ref + "</p>";
+  function renderTap() {
+    $("td-inch-out").innerHTML = "<b>" + $("td-inch").value + "</b> — tap drill <b>" + ED_Shop.tapDrillInch($("td-inch").value, SH.tap_drill.inch) + "</b>";
+    const m = SH.tap_drill.metric.find((r) => r.thread === $("td-metric").value);
+    $("td-metric-out").innerHTML = m ? "<b>M" + m.thread + "</b> — tap drill <b>" + m.drill + "</b> (" + m.decimal + " in)" : "";
+  }
+  $("td-inch").addEventListener("change", renderTap);
+  $("td-metric").addEventListener("change", renderTap);
+  renderTap();
+  /* 5. Bolt ID */
+  $("bolt-id").innerHTML =
+    "<p class='ed-note'>" + SH.bolt_id.how + "</p>" +
+    "<h4>SAE</h4>" +
+    "<label for='bi-sae-dia'>Measured diameter, inches</label><input type='text' id='bi-sae-dia' inputmode='decimal' placeholder='e.g. 0.375'>" +
+    "<label for='bi-sae-tpi'>Threads per inch</label><input type='text' id='bi-sae-tpi' inputmode='numeric' placeholder='e.g. 16'>" +
+    "<p id='bi-sae-out'></p>" +
+    "<h4>Metric</h4>" +
+    "<label for='bi-m-dia'>Measured diameter, mm</label><input type='text' id='bi-m-dia' inputmode='decimal' placeholder='e.g. 8'>" +
+    "<label for='bi-m-pitch'>Pitch, mm between threads</label><input type='text' id='bi-m-pitch' inputmode='decimal' placeholder='e.g. 1.25'>" +
+    "<p id='bi-m-out'></p>" +
+    "<p class='ed-note'>SAE series (" + SH.bolt_id.sae.length + " threads) and metric series (" + SH.bolt_id.metric.length + " threads) come from the tap-drill tables. Source: " + SH.bolt_id.ref + "</p>";
+  function renderBolt() {
+    const sd = parseFloat($("bi-sae-dia").value), st = parseFloat($("bi-sae-tpi").value);
+    const hit = ED_Shop.boltIdSae(sd, st, SH.bolt_id.sae);
+    $("bi-sae-out").innerHTML = !$("bi-sae-dia").value || !$("bi-sae-tpi").value ? "" :
+      hit ? "That measures as <b>" + hit + "</b>." : "No match in the library tables for " + sd + " in / " + st + " TPI — re-measure, or it is a thread outside these tables.";
+    const md = parseFloat($("bi-m-dia").value), mp = parseFloat($("bi-m-pitch").value);
+    const mhit = ED_Shop.boltIdMetric(md, mp, SH.bolt_id.metric);
+    $("bi-m-out").innerHTML = !$("bi-m-dia").value || !$("bi-m-pitch").value ? "" :
+      mhit ? "That measures as <b>M" + mhit + "</b>." : "No match in the library tables for M" + md + " x " + mp + " — re-measure, or it is a thread outside these tables.";
+  }
+  ["bi-sae-dia", "bi-sae-tpi", "bi-m-dia", "bi-m-pitch"].forEach((id) =>
+    $(id).addEventListener("input", renderBolt));
+  /* 6. Oil viscosity */
+  $("oil-viscosity").innerHTML =
+    "<p><b>Rule:</b> " + SH.oil.rule + "</p>" +
+    SH.oil.grades.map((g) => "<div class='ed-cause'><b>" + g.type + " " + g.viscosity + "</b> (" + g.hd_rating + ")" +
+      "<br>Lowest ambient temperature: " + g.lowest_temp +
+      "<br>Cold-weather starts below 50°F (10°C): " + g.cold_start + "</div>").join("") +
+    "<p class='ed-note'>" + SH.oil.diesel + "</p>" +
+    "<p class='ed-note'>" + SH.oil.service + "</p>" +
+    "<p class='ed-note'>Source: " + SH.oil.ref + "</p>";
+  /* 7. Compression ratio */
+  $("compression-ratio").innerHTML =
+    "<label for='cr-bore'>Bore, inches</label><input type='text' id='cr-bore' inputmode='decimal' value='3.498'>" +
+    "<label for='cr-stroke'>Stroke, inches</label><input type='text' id='cr-stroke' inputmode='decimal' value='4.25'>" +
+    "<label for='cr-chamber'>Chamber volume, cc (measured with a burette)</label><input type='text' id='cr-chamber' inputmode='decimal' value='78.7'>" +
+    "<div id='cr-result'></div>" +
+    "<h4>Stock numbers</h4>" +
+    SH.compression_ratio.stock.map((s) => "<div class='ed-cause'><b>" + s.model + "</b> — bore " + s.bore_in + " in x stroke " + s.stroke_in + " in, " + s.disp_cid + " cu. in. (" + s.disp_cc + " cc), ratio <b>" + s.cr.toFixed(1) + ":1</b>" +
+      "<br><span class='ed-note'>Chamber volume implied by the published ratio (derived, not published): " + s.chamber_cc_derived + " cc.</span></div>").join("") +
+    "<p class='ed-note'>" + SH.compression_ratio.note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.compression_ratio.ref + "</p>";
+  function renderCr() {
+    const bore = parseFloat($("cr-bore").value), stroke = parseFloat($("cr-stroke").value), chamber = parseFloat($("cr-chamber").value);
+    const swept = ED_Shop.sweptCcPerCyl(bore, stroke);
+    const ratio = ED_Shop.compressionRatio(bore, stroke, chamber);
+    $("cr-result").innerHTML = ratio === null ? "<p>Enter bore, stroke and a measured chamber volume.</p>"
+      : "<div class='ed-cause'>Swept volume per cylinder: <b>" + swept.toFixed(1) + " cc</b> (" + (swept / 16.387).toFixed(2) + " cu. in.)" +
+        "<br>Compression ratio: <b>" + ratio.toFixed(2) + " : 1</b></div>";
+  }
+  ["cr-bore", "cr-stroke", "cr-chamber"].forEach((id) => $(id).addEventListener("input", renderCr));
+  renderCr();
+  /* 8. Carb CFM */
+  $("carb-cfm").innerHTML =
+    "<p>Stock motor: <b>" + SH.carb_cfm.stock_disp_cid + " cu. in.</b> (" + SH.carb_cfm.carb + ").</p>" +
+    "<label for='cfm-cid'>Displacement, cubic inches</label><input type='text' id='cfm-cid' inputmode='decimal' value='81.6'>" +
+    "<label for='cfm-rpm'>RPM</label><input type='text' id='cfm-rpm' inputmode='numeric' value='5500'>" +
+    "<label for='cfm-ve'>Volumetric efficiency, % (your assumption)</label><input type='text' id='cfm-ve' inputmode='numeric' value='85'>" +
+    "<div id='cfm-result'></div>" +
+    "<p class='ed-note'>" + SH.carb_cfm.note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.carb_cfm.ref + "</p>";
+  function renderCfm() {
+    const cfm = ED_Shop.carbCfm(parseFloat($("cfm-cid").value), parseFloat($("cfm-rpm").value), parseFloat($("cfm-ve").value));
+    $("cfm-result").innerHTML = cfm === null ? "<p>Enter displacement, rpm and VE (0-100%).</p>"
+      : "<div class='ed-cause'>Airflow the engine needs: <b>" + cfm + " CFM</b></div>";
+  }
+  ["cfm-cid", "cfm-rpm", "cfm-ve"].forEach((id) => $(id).addEventListener("input", renderCfm));
+  renderCfm();
+  /* 9. Sag setter */
+  $("sag-setter").innerHTML =
+    "<h4>Preload adjustment (FSM §2 p. 2-73)</h4>" +
+    "<ol>" + SH.sag.procedure.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>" + SH.sag.magazine + "</p>" +
+    "<h4>Measure the sag</h4>" +
+    "<p class='ed-note'>" + SH.sag.measure + "</p>" +
+    "<label for='sag-fu'>Front unloaded, inches</label><input type='text' id='sag-fu' inputmode='decimal' placeholder='axle to fender, wheel off ground'>" +
+    "<label for='sag-fl'>Front loaded (you on it), inches</label><input type='text' id='sag-fl' inputmode='decimal' placeholder='same two points, you sitting on it'>" +
+    "<label for='sag-ru'>Rear unloaded, inches</label><input type='text' id='sag-ru' inputmode='decimal' placeholder='axle to fender, wheel off ground'>" +
+    "<label for='sag-rl'>Rear loaded (you on it), inches</label><input type='text' id='sag-rl' inputmode='decimal' placeholder='same two points, you sitting on it'>" +
+    "<div id='sag-result'></div>" +
+    "<p class='ed-note'><b>No target here on purpose:</b> " + SH.sag.no_target + "</p>" +
+    "<p class='ed-note'>Source: " + SH.sag.ref + "</p>";
+  function renderSag() {
+    const f = ED_Shop.sagDrop(parseFloat($("sag-fu").value), parseFloat($("sag-fl").value));
+    const r = ED_Shop.sagDrop(parseFloat($("sag-ru").value), parseFloat($("sag-rl").value));
+    $("sag-result").innerHTML =
+      (f === null && r === null) ? "" :
+      "<div class='ed-cause'>" +
+      (f !== null ? "Front sag: <b>" + f + " in</b><br>" : "") +
+      (r !== null ? "Rear sag: <b>" + r + " in</b>" : "") + "</div>";
+  }
+  ["sag-fu", "sag-fl", "sag-ru", "sag-rl"].forEach((id) => $(id).addEventListener("input", renderSag));
+  /* 10. Parts interchange */
+  $("parts-interchange").innerHTML =
+    SH.interchange.rows.map((r) => "<div class='ed-cause'><b>" + r.part + "</b> — " + r.fits +
+      "<br>" + r.note +
+      "<br><span class='ed-note'>Source: " + r.source + "</span></div>").join("") +
+    "<p class='ed-note'>Source: " + SH.interchange.ref + "</p>";
+  /* 11. Pre-ride check */
+  $("pre-ride").innerHTML =
+    "<p class='ed-note'>" + SH.preride.structure_note + "</p>" +
+    SH.preride.groups.map((g) =>
+      "<div class='ed-cause'><h4>" + g.letter + " — " + g.title + "</h4>" +
+      (g.items.length ? g.items.map((it, i) => "<p><label style='font-weight:400'><input type='checkbox' style='width:auto;margin-right:8px'> " + it + "</label></p>").join("") : "<p class='ed-note'>" + g.note + "</p>") +
+      (g.sub_items ? "<p><b>" + g.sub_title + "</b></p>" + g.sub_items.map((it) => "<p><label style='font-weight:400'><input type='checkbox' style='width:auto;margin-right:8px'> " + it + "</label></p>").join("") + "<p class='ed-note'>Source: " + g.sub_source + "</p>" : "") +
+      "<p class='ed-note'>Source: " + g.source + "</p></div>").join("") +
+    "<p class='ed-note'>Source: " + SH.preride.ref + "</p>";
+
   /* ---------- VIN (pure decode lives in vin.js, tested in test.js) ---------- */
   $("vin-decode").addEventListener("click", () => {
     const r = ED_VIN.decode($("vin-input").value);

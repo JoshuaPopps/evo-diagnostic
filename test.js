@@ -332,9 +332,9 @@ check("manifest wires icon-192", (manifest.icons || []).some((i) => i.sizes === 
 check("manifest wires icon-512", (manifest.icons || []).some((i) => i.sizes === "512x512"));
 check("icon-512.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-512.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
 check("icon-192.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-192.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
-check("sw.js caches v10", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v10"));
-check("sw.js precaches tire.js + nhtsa.js + handoff.js + sw-update.js", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("tire.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("nhtsa.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("handoff.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("sw-update.js"));
-check("index.html loads tire.js + nhtsa.js + handoff.js", html.includes('src="tire.js"') && html.includes('src="nhtsa.js"') && html.includes('src="handoff.js"'));
+check("sw.js caches v11", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v11"));
+check("sw.js precaches tire.js + nhtsa.js + handoff.js + sw-update.js + shop.js", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("tire.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("nhtsa.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("handoff.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("sw-update.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("shop.js"));
+check("index.html loads tire.js + nhtsa.js + handoff.js + shop.js", html.includes('src="tire.js"') && html.includes('src="nhtsa.js"') && html.includes('src="handoff.js"') && html.includes('src="shop.js"'));
 check("index.html has the new sections", ["part-detail", "flash-input", "tire-input", "clip-record", "history-list", "add-bike-model"].every((id) => html.includes('id="' + id + '"')));
 D.cc_photos.forEach((p) => check("CC photo present: " + p.file, fs.existsSync(path.join(__dirname, p.file))));
 check("all CC photos have credits", D.cc_photos.every((p) => p.credit.includes("CC BY")));
@@ -552,6 +552,151 @@ check("app.js sends via ED_Handoff", appjs.includes("ED_Handoff.buildUrl"));
    and a click threw "Cannot read properties of undefined (reading 'q')". --- */
 check("answer() ignores clicks after the tree is done", appjs.includes("if (current.step >= t.steps.length) return;"));
 check("finishTree clears the question buttons", appjs.includes("$(\"tree-step\").innerHTML = \"\";"));
+
+/* --- shop tab (Nov 25, 2026 batch 1): 11 pull-ins, library-first --- */
+const SH = require("./shop.js");
+check("index.html has the Shop tab", html.includes('data-tab="shop"') && html.includes('id="panel-shop"'));
+["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride"].forEach((id) =>
+  check("index.html has the " + id + " card", html.includes('id="' + id + '"')));
+check("app.js renders all 11 shop cards", ["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride"].every((id) => appjs.includes("$(\"" + id + "\")")));
+check("index.html loads shop.js before app.js", html.indexOf('src="shop.js"') > 0 && html.indexOf('src="shop.js"') < html.indexOf('src="app.js"'));
+
+/* plug reader: 9 conditions from Repair Manual Ch. 3 p. 112 */
+eq("plug reader has 9 conditions", D.shop.plug_reader.conditions.length, 9);
+check("plug reader names the stock plug + gap", D.shop.plug_reader.plug === "5R6A" && D.shop.plug_reader.gap === "0.038-0.043");
+check("every plug condition has look, cause, action",
+  D.shop.plug_reader.conditions.every((c) => c.name && c.look && c.cause && c.action));
+check("plug reader has Normal, Carbon fouled, Oil fouled, Overheating, Preignition",
+  ["Normal", "Carbon fouled", "Oil fouled", "Overheating", "Preignition"].every((n) => D.shop.plug_reader.conditions.some((c) => c.name === n)));
+check("carbon fouled points at the rich tree, overheating at the lean tree, preignition at the misfire tree",
+  D.shop.plug_reader.conditions.find((c) => c.name === "Carbon fouled").see.includes("Rich running") &&
+  D.shop.plug_reader.conditions.find((c) => c.name === "Overheating").see.includes("Lean idle") &&
+  D.shop.plug_reader.conditions.find((c) => c.name === "Preignition").see.includes("Misfire"));
+check("plug reader cites Repair Manual Ch. 3 p. 112", D.shop.plug_reader.ref.includes("p. 112"));
+check("plug reader warns against sand-blast cleaning", D.shop.plug_reader.notes.some((n) => n.includes("sand-blast")));
+check("plug reader cites the plug-gap source, not a new plug spec", D.shop.plug_reader.plug === D.specs.plug && D.shop.plug_reader.gap === D.specs.plug_gap_in);
+
+/* wire & breaker: FSM §8 p. 8-1 + App. A Table 2 */
+eq("5 circuit breakers", D.shop.wire_fuse.breakers.length, 5);
+eq("main breaker is 30A", D.shop.wire_fuse.breakers.find((b) => b.circuit === "Main").amps, 30);
+check("ignition, lights, accessory, instruments are all 15A",
+  ["Ignition", "Lights", "Accessory", "Instruments"].every((c) => D.shop.wire_fuse.breakers.find((b) => b.circuit === c).amps === 15));
+eq("14 wire-gauge rows", D.shop.wire_fuse.wires.length, 14);
+eq("main breaker feed is 12 GA", D.shop.wire_fuse.wires.find((w) => w.circuit === "Main circuit breaker feed").gauge, "12");
+eq("starter cable is 10 GA", D.shop.wire_fuse.wires.find((w) => w.circuit.startsWith("Starter terminal")).gauge, "10");
+eq("ignition module is 16 GA", D.shop.wire_fuse.wires.find((w) => w.circuit === "Ignition module").gauge, "16");
+check("no generic ampacity table is claimed (library has none)",
+  D.shop.wire_fuse.notes.some((n) => n.includes("No generic AWG ampacity table")));
+
+/* gear ratio math (pure functions) */
+eq("primary 36/25 = 1.44", SH.primaryRatio(25, 36), 1.44);
+eq("final 65/32 = 2.03125", SH.finalRatio(32, 65), 2.03125);
+eq("overall 5th with stock 65T rear = 2.925 (NOT the book's 3.15)", SH.overallRatio(1.44, 1.00, 2.03125), 2.925);
+eq("overall 5th with a 70T rear = 3.15 (matches the book)", SH.overallRatio(1.44, 1.00, 70 / 32), 3.15);
+eq("overall 1st 1995-99 with 70T rear = 10.11 (matches the FSM)", Math.round(SH.overallRatio(1.44, 3.21, 70 / 32) * 100) / 100, 10.11);
+eq("60 mph in 5th (FSM overall 3.15, 25.21 in tire) = 2519 rpm", SH.rpmAtSpeed(60, 3.15, 25.21), 2519);
+eq("3000 rpm in 5th = 71.5 mph", SH.speedAtRpm(3000, 3.15, 25.21), 71.5);
+eq("130/90-16 tire diameter = 25.21 in", SH.tireDiameterIn(130, 90, 16), 25.21);
+eq("100/90-19 tire diameter = 26.09 in", SH.tireDiameterIn(100, 90, 19), 26.09);
+check("rpmAtSpeed returns null on bad input", SH.rpmAtSpeed(60, 3.15, 0) === null && SH.rpmAtSpeed(0, 3.15, 25.21) === null);
+check("tire presets match the computed diameters",
+  D.shop.gear_ratio.tire_presets.every((t) => SH.tireDiameterIn(t.section_mm, t.aspect, t.rim_in) === t.dia_in));
+eq("stock sprockets are 25/36/32/65", [D.shop.gear_ratio.stock.comp, D.shop.gear_ratio.stock.clutch, D.shop.gear_ratio.stock.trans, D.shop.gear_ratio.stock.rear].join("/"), "25/36/32/65");
+eq("internal ratios: 3 year sets", D.shop.gear_ratio.internal.length, 3);
+eq("1995-1999 internal 1st is 3.21, 3rd 1.57, 5th 1.00", D.shop.gear_ratio.internal[2].gears.join(","), "3.21,2.21,1.57,1.23,1");
+check("gear flag names the 65T/70T contradiction and the Clymer 1st disagreement",
+  D.shop.gear_ratio.flag.includes("2.93") && D.shop.gear_ratio.flag.includes("70-tooth") && D.shop.gear_ratio.flag.includes("10.41"));
+check("FSM overall table is the first reference", D.shop.gear_ratio.overall[0].years.includes("FSM") && D.shop.gear_ratio.overall[0].gears[0] === 10.11);
+check("gear ref cites FSM §6 p. 6-1 and Clymer Table 1", D.shop.gear_ratio.ref.includes("§6 p. 6-1") && D.shop.gear_ratio.ref.includes("Clymer"));
+
+/* tap & drill: 39 inch rows (Repair Manual Table 7) + 17 metric (Clymer Table 11) */
+eq("inch tap drill table has 39 rows", D.shop.tap_drill.inch.length, 39);
+eq("metric tap drill table has 17 rows", D.shop.tap_drill.metric.length, 17);
+eq("1/4-20 tap drill is No. 8 (the manual's value, not the generic No. 7)", SH.tapDrillInch("1/4-20", D.shop.tap_drill.inch), "No. 8");
+eq("1/4-28 tap drill is No. 3", SH.tapDrillInch("1/4-28", D.shop.tap_drill.inch), "No. 3");
+eq("3/8-16 tap drill is 5/16", SH.tapDrillInch("3/8-16", D.shop.tap_drill.inch), "5/16");
+eq("1-14 tap drill is 15/16", SH.tapDrillInch("1-14", D.shop.tap_drill.inch), "15/16");
+eq("M12x1.75 tap drill is 13/32", SH.tapDrillMetric("12x1.75", D.shop.tap_drill.metric), "13/32");
+eq("M6x1.00 tap drill is No. 9", SH.tapDrillMetric("6x1.00", D.shop.tap_drill.metric), "No. 9");
+eq("M3x0.50 tap drill is No. 39", SH.tapDrillMetric("3x0.50", D.shop.tap_drill.metric), "No. 39");
+check("7x1.00 uses 15/64 and the Clymer 16/64 misprint is flagged, never used as a value",
+  SH.tapDrillMetric("7x1.00", D.shop.tap_drill.metric) === "15/64" &&
+  D.shop.tap_drill.notes.some((n) => n.includes("16/64") && n.includes("misprint")) &&
+  !D.shop.tap_drill.metric.some((r) => r.drill === "16/64"));
+check("unknown thread returns null", SH.tapDrillInch("9/16-24", D.shop.tap_drill.inch) === null);
+check("every inch row has a thread and a drill", D.shop.tap_drill.inch.every((r) => r.thread && r.drill));
+check("every metric row has thread, drill, decimal and fraction", D.shop.tap_drill.metric.every((r) => r.thread && r.drill && r.decimal && r.fraction));
+
+/* bolt ID: same series as the tap tables */
+eq("SAE bolt series has 39 threads", D.shop.bolt_id.sae.length, 39);
+eq("metric bolt series has 17 threads", D.shop.bolt_id.metric.length, 17);
+eq("0.375 in / 16 TPI is 3/8-16", SH.boltIdSae(0.375, 16, D.shop.bolt_id.sae), "3/8-16");
+eq("0.25 in / 20 TPI is 1/4-20", SH.boltIdSae(0.25, 20, D.shop.bolt_id.sae), "1/4-20");
+eq("0.25 in / 28 TPI is 1/4-28 (same diameter, different thread)", SH.boltIdSae(0.25, 28, D.shop.bolt_id.sae), "1/4-28");
+eq("M8 / 1.25 pitch is M8x1.25", SH.boltIdMetric(8, 1.25, D.shop.bolt_id.metric), "M8x1.25");
+eq("M12 / 1.75 pitch is M12x1.75", SH.boltIdMetric(12, 1.75, D.shop.bolt_id.metric), "M12x1.75");
+check("diameter alone never matches (0.375 in with no TPI returns null)", SH.boltIdSae(0.375, null, D.shop.bolt_id.sae) === null);
+check("a non-table combination returns null", SH.boltIdSae(0.375, 20, D.shop.bolt_id.sae) === null && SH.boltIdMetric(8, 1.5, D.shop.bolt_id.metric) === null);
+check("every SAE series row exists in the inch tap table", D.shop.bolt_id.sae.every((s) => D.shop.tap_drill.inch.some((r) => r.thread === s.thread)));
+check("every metric series row exists in the metric tap table", D.shop.bolt_id.metric.every((s) => D.shop.tap_drill.metric.some((r) => "M" + r.thread === s.thread)));
+
+/* oil viscosity: FSM §1 p. 1-9 */
+eq("oil table has 4 grades", D.shop.oil.grades.length, 4);
+eq("10W40 is for below 40F, Excellent cold starts", D.shop.oil.grades[0].viscosity + "|" + D.shop.oil.grades[0].lowest_temp + "|" + D.shop.oil.grades[0].cold_start, "SAE 10W40|Below 40°F (4°C)|Excellent");
+eq("20W50 is for above 40F, Good cold starts", D.shop.oil.grades[1].viscosity + "|" + D.shop.oil.grades[1].lowest_temp + "|" + D.shop.oil.grades[1].cold_start, "SAE 20W50|Above 40°F (4°C)|Good");
+eq("SAE 50 is above 60F, Poor cold starts", D.shop.oil.grades[2].viscosity + "|" + D.shop.oil.grades[2].lowest_temp, "SAE 50|Above 60°F (16°C)");
+eq("SAE 60 is above 80F, Poor cold starts", D.shop.oil.grades[3].viscosity + "|" + D.shop.oil.grades[3].lowest_temp, "SAE 60|Above 80°F (27°C)");
+check("oil rule is the lowest-temperature-before-next-change rule", D.shop.oil.rule.includes("lowest temperature expected before next scheduled oil change"));
+check("diesel substitute is CE/CF/CF-4/CG-4, 20W-50 first", D.shop.oil.diesel.includes("CE, CF, CF-4, and CG-4") && D.shop.oil.diesel.includes("20W-50, 15W-40, 10W-40"));
+check("oil ref cites FSM §1 p. 1-9", D.shop.oil.ref.includes("§1, p. 1-9"));
+
+/* compression ratio: published bore/stroke/ratio, derived chamber */
+eq("compression stock table has 5 motors", D.shop.compression_ratio.stock.length, 5);
+eq("Evo is 3.498 x 4.25, 81.6 CID, 9.5:1", D.shop.compression_ratio.stock[0].bore_in + "x" + D.shop.compression_ratio.stock[0].stroke_in + "/" + D.shop.compression_ratio.stock[0].disp_cid + "/" + D.shop.compression_ratio.stock[0].cr, "3.498x4.25/81.6/9.5");
+eq("1200S is 10.0:1, the rest of the Sportsters 9.0:1", D.shop.compression_ratio.stock.filter((s) => s.cr === 10.0).length, 1);
+eq("swept volume per Evo cylinder is 669.3 cc", Math.round(SH.sweptCcPerCyl(3.498, 4.25) * 10) / 10, 669.3);
+eq("3.498x4.25 with a 78.7 cc chamber is 9.5:1", SH.compressionRatio(3.498, 4.25, 78.7), 9.5);
+check("every derived chamber volume matches the formula (swept / (ratio - 1))",
+  D.shop.compression_ratio.stock.every((s) => Math.abs(SH.chamberCcFromRatio(s.bore_in, s.stroke_in, s.cr) - s.chamber_cc_derived) < 0.05));
+check("derived chambers are labeled derived, never published", D.shop.compression_ratio.note.includes("DERIVED") && D.shop.compression_ratio.note.includes("not published"));
+eq("81.6 CID at 5500 rpm and 85% VE needs 110.4 CFM", SH.carbCfm(81.6, 5500, 85), 110.4);
+eq("81.6 CID at 6000 rpm and 85% VE needs 120.4 CFM", SH.carbCfm(81.6, 6000, 85), 120.4);
+check("carb CFM rejects VE over 100% and zero rpm", SH.carbCfm(81.6, 5500, 101) === null && SH.carbCfm(81.6, 0, 85) === null);
+check("carb CFM note says no CV40 flow rating is published in the library", D.shop.carb_cfm.note.includes("No published CFM flow rating for the CV40"));
+check("carb CFM stock displacement matches the manual (81.6)", D.shop.carb_cfm.stock_disp_cid === 81.6);
+
+/* sag: FSM procedure, no target anywhere */
+eq("sag procedure has 5 steps", D.shop.sag.procedure.length, 5);
+check("sag procedure names the spanner wrench 94455-89", D.shop.sag.procedure.some((s) => s.includes("94455-89")));
+check("sag procedure: OUT increases preload, IN decreases it", D.shop.sag.procedure.some((s) => s.includes("OUT") && s.includes("increases the spring preload")) && D.shop.sag.procedure.some((s) => s.includes("IN") && s.includes("decreases the spring preload")));
+check("sag procedure: shock bolts 115-130 ft-lbs, shocks not repairable", D.shop.sag.procedure.some((s) => s.includes("115-130 ft-lbs") && s.includes("not repairable")));
+eq("sag drop is unloaded minus loaded", SH.sagDrop(12, 10.5), 1.5);
+check("sag has no target — the gap is named, not filled", D.shop.sag.no_target.includes("No factory sag target is published"));
+check("sag magazine line is flagged magazine", D.shop.sag.magazine.includes("magazine"));
+
+/* parts interchange: 7 rows, magazine rows flagged */
+eq("interchange has 7 rows", D.shop.interchange.rows.length, 7);
+check("wheel bearing 9052 fits 1973-99 Big Twin + Sportster", D.shop.interchange.rows.some((r) => r.part.includes("9052") && r.fits.includes("1973-99")));
+check("brake pads 44063-83C/D fit all XL/FX/FL 1984-99", D.shop.interchange.rows.some((r) => r.part.includes("44063-83C/D") && r.fits.includes("1984-99")));
+check("stator and regulator rows are explicit NON-interchange warnings", D.shop.interchange.rows.filter((r) => r.fits.startsWith("DOES NOT interchange")).length === 2);
+check("magazine interchange rows are flagged NOT an FSM cause",
+  D.shop.interchange.rows.filter((r) => r.source.includes("Easyriders")).every((r) => r.source.includes("NOT an FSM cause")));
+check("head bolts / rocker boxes row warns they do not interchange between years",
+  D.shop.interchange.rows.some((r) => r.part.includes("Cylinder head bolts") && r.fits.includes("NOT interchangeable")));
+
+/* pre-ride: Clymer 12 + Sportster lights detail, T-CLOCS structure labeled */
+eq("pre-ride has 6 T-CLOCS groups", D.shop.preride.groups.length, 6);
+check("pre-ride groups are T, C, L, O, C, S in order", D.shop.preride.groups.map((g) => g.letter).join("") === "TCLOCS");
+eq("pre-ride checklist items total 13 (12 Clymer + the Sportster fastener item) + 8 lights sub-checks", D.shop.preride.groups.reduce((n, g) => n + g.items.length, 0) + D.shop.preride.groups.reduce((n, g) => n + (g.sub_items ? g.sub_items.length : 0), 0), 21);
+check("pre-ride T group checks tires + pressure", D.shop.preride.groups[0].items[0].includes("tire pressure"));
+check("pre-ride L group has the 8-item lights-and-horn detail", D.shop.preride.groups[2].sub_items.length === 8 && D.shop.preride.groups[2].sub_items[0].includes("front brake lever"));
+check("pre-ride O group names DOT 5 only", D.shop.preride.groups[3].items.some((i) => i.includes("DOT 5 silicone ONLY")));
+check("pre-ride C group has the belt tension 3/8-1/2 in and the head-bolt caution", D.shop.preride.groups[4].items.some((i) => i.includes("3/8-1/2 in")) && D.shop.preride.groups[4].items.some((i) => i.includes("do not check the cylinder head bolts")));
+check("pre-ride S group is empty and names the gap instead of inventing a stand check",
+  D.shop.preride.groups[5].items.length === 0 && D.shop.preride.groups[5].note.includes("No stand check"));
+check("pre-ride structure note says the T-CLOCS headings are MSF's and the checks are Clymer/Sportster",
+  D.shop.preride.structure_note.includes("MSF") && D.shop.preride.structure_note.includes("Clymer"));
+check("every pre-ride group cites its source", D.shop.preride.groups.every((g) => g.source));
 
 /* --- service-worker update button wiring (sw-update.js) --- */
 const swjs = fs.readFileSync(path.join(__dirname, "sw.js"), "utf8");

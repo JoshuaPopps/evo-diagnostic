@@ -55,7 +55,7 @@
   <header>
     <p class="ed-note">Pocket Garage &middot; Shop Sheet N&ordm; 8</p>
     <h1>The Evo Diagnostic</h1>
-    <p class="ed-note">Photo, video and sound diagnostics for Evo-era Harleys. Guided trees from the factory manuals, parts ID from a traced atlas, idle RPM from sound, VIN decode. Offline-first. No account. The app ranks possibilities and names the confirming test &mdash; it never declares a verdict from a photo or sound alone.</p>
+    <p class="ed-note">Photo, video and sound diagnostics for Evo-era Harleys. Guided trees from the factory manuals, parts ID from a traced atlas, idle RPM from sound, VIN decode, and a Shop tab of garage references and calculators — plug reading, wire and breaker sizes, gear ratios, tap drills, bolt ID, oil grades, compression ratio, carb CFM, sag, parts interchange, and the pre-ride check. Offline-first. No account. The app ranks possibilities and names the confirming test &mdash; it never declares a verdict from a photo or sound alone.</p>
     <label for="bike">Bike</label>
     <select id="bike"></select>
   </header>
@@ -67,6 +67,7 @@
     <button class="ed-tab" role="tab" data-tab="vin" aria-selected="false">VIN</button>
     <button class="ed-tab" role="tab" data-tab="recalls" aria-selected="false">Recalls</button>
     <button class="ed-tab" role="tab" data-tab="torque" aria-selected="false">Torque</button>
+    <button class="ed-tab" role="tab" data-tab="shop" aria-selected="false">Shop</button>
     <button class="ed-tab" role="tab" data-tab="data" aria-selected="false">Data</button>
   </nav>
 
@@ -386,6 +387,64 @@
     </div>
   </section>
 
+  <section class="ed-panel" id="panel-shop">
+    <div class="ed-card">
+      <h3>Plug reader — read the plug, read the motor</h3>
+      <p class="ed-note">From the 1984&ndash;1999 Softail Repair Manual, Ch. 3, p. 112. Pull a plug after a normal ride, look at the firing tip, match it below. The Diagnose tab photo upload gives a rough color read; this card is the reference it reads against.</p>
+      <div id="plug-reader"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Wire &amp; breaker — what the factory ran</h3>
+      <p class="ed-note">Evo Softails use circuit breakers, not fuses. Breaker ratings from FSM #99482-98 §8 p. 8-1; wire gauges from the 1997 Main Harness table (App. A Table 2, Part No. 70216-96). The breaker protects the wire — never fit a bigger breaker without bigger wire.</p>
+      <div id="wire-fuse"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Gear ratio — sprockets in, rpm out</h3>
+      <p class="ed-note">Enter the teeth on your bike. Stock 1997&ndash;98 numbers and the book&rsquo;s own contradiction are below the calculator — count your own teeth, the calculator trusts what you type.</p>
+      <div id="gear-ratio"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Tap &amp; drill — what bit for which thread</h3>
+      <p class="ed-note">Inch: 1984&ndash;1999 Softail Repair Manual, Table 7, p. 32. Metric: Clymer Table 11, pp. 33&ndash;34. Both tables read visually from the printed page Nov 25, 2026.</p>
+      <div id="tap-drill"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Bolt ID — measure it, name it</h3>
+      <p class="ed-note">Thread series from the same two tables as Tap &amp; drill. A diameter alone never identifies a thread — you need the diameter AND the pitch (metric) or threads-per-inch (SAE).</p>
+      <div id="bolt-id"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Oil viscosity — which grade for which weather</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-9. Pick by the lowest temperature expected before your next oil change, not by today&rsquo;s weather.</p>
+      <div id="oil-viscosity"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Compression ratio — bore, stroke, chamber</h3>
+      <p class="ed-note">Bore, stroke, displacement and ratio are published (Repair Manual Table 1, Ch. 5 p. 179; Sportster Table 1, p. 193). Chamber volume is never published — measure it with a burette and enter it. The derived chamber numbers below are arithmetic on the published ratio, not published figures.</p>
+      <div id="compression-ratio"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Carb CFM — what the motor needs</h3>
+      <p class="ed-note">CFM = CID &times; RPM &times; VE / 3456. This sizes what the engine needs at a given rpm — no published CFM flow rating for the CV40 exists in the library, so none is claimed here. VE is your assumption, not a spec.</p>
+      <div id="carb-cfm"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Sag setter — set the preload, record the sag</h3>
+      <p class="ed-note">Preload procedure from FSM #99482-98 §2, p. 2-73. No factory sag target is published anywhere in the library — this card records your measurements and never prints a target it cannot cite.</p>
+      <div id="sag-setter"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Parts interchange — what fits what</h3>
+      <p class="ed-note">Fitment ranges from the factory parts catalogs and the manuals, plus two magazine interchange tips flagged as magazine. A part with no fitment range in the library does not appear here.</p>
+      <div id="parts-interchange"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Pre-ride check — T-CLOCS, Evo checks</h3>
+      <p class="ed-note">The checks are Clymer Ch. 3 (Evo) and Sportster Ch. 3, grouped under the MSF T-CLOCS headings. Tick them off before every ride — the list is the same every time, that is the point.</p>
+      <div id="pre-ride"></div>
+    </div>
+  </section>
+
   <section class="ed-panel" id="panel-data">
     <div class="ed-card">
       <h3>Your data</h3>
@@ -402,7 +461,7 @@
     </div>
     <div class="ed-card">
       <h3>Sources &amp; credits</h3>
-      <p class="ed-note">Specs and procedures: FSM #99482-98 (1997&ndash;98 Softail Service Manual), 1984&ndash;1999 Softail Repair Manual, S&amp;S instruction 51-1012, Easyriders ER_153 / ER_166, factory bulletin P-20 (Nov 18, 1991). Recalls, bulletins and complaint counts: NHTSA (U.S. federal public domain). Photos: Wikimedia Commons, credited on each photo. Diagrams are hand-traced simplifications, never factory art. Torque and spec values are published facts, each labeled with its source; unverified items stay flagged.</p>
+      <p class="ed-note">Specs and procedures: FSM #99482-98 (1997&ndash;98 Softail Service Manual), 1984&ndash;1999 Softail Repair Manual, S&amp;S instruction 51-1012, Easyriders ER_153 / ER_166, factory bulletin P-20 (Nov 18, 1991). Shop tab: plug conditions (Repair Manual Ch. 3, p. 112), tap drill (Repair Manual Table 7, p. 32; Clymer Table 11, pp. 33&ndash;34), gear ratios (FSM §6 p. 6-1; Clymer five-speed specs), oil grades (FSM §1 p. 1-9), compression ratios (Repair Manual Ch. 5 p. 179; Sportster p. 193), wire gauges and breaker ratings (FSM §8 p. 8-1; App. A Table 2), pre-ride checks (Clymer Ch. 3, p. 74; Sportster Ch. 3, pp. 113&ndash;114), shock preload (FSM §2 p. 2-73). Recalls, bulletins and complaint counts: NHTSA (U.S. federal public domain). Photos: Wikimedia Commons, credited on each photo. Diagrams are hand-traced simplifications, never factory art. Torque and spec values are published facts, each labeled with its source; unverified items stay flagged.</p>
     </div>
   </section>
 </div>
@@ -411,6 +470,7 @@
 <script src="scoring.js"></script>
 <script src="audio.js"></script>
 <script src="tire.js"></script>
+<script src="shop.js"></script>
 <script src="nhtsa.js"></script>
 <script src="handoff.js"></script>
 <script src="sw-update.js"></script>

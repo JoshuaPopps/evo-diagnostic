@@ -1033,6 +1033,223 @@ const ED_DATA = {
     { file: "assets/evo-engine-room.jpg", subject: "Evolution engine room 1984-99, Harley Museum", credit: "Michael Barera, CC BY-SA 4.0, via Wikimedia Commons", page: "https://commons.wikimedia.org/wiki/File:Harley-Davidson_Museum_February_2024_14_(Engine_Room--Evolution,_1984-99).jpg" },
     { file: "assets/evo-sportster-engine-room.jpg", subject: "Evolution Sportster engine room, Harley Museum", credit: "Michael Barera, CC BY-SA 4.0, via Wikimedia Commons", page: "https://commons.wikimedia.org/wiki/File:Harley-Davidson_Museum_February_2024_24_(Engine_Room--Evolution_Sportster,_1986-present).jpg" },
     { file: "assets/v-twin-valve-diagram.jpg", subject: "V-twin valve diagram", credit: "Ericd, CC BY-SA 3.0, via Wikimedia Commons", page: "https://commons.wikimedia.org/wiki/File:Harley_V-twin_valve_diagram.jpg" }
-  ]
+  ],
+  /* Shop tools (Nov 25, 2026 batch 1). Same rule as the rest of the app:
+     every number is a published fact with its source. Magazine items are
+     flagged "NOT an FSM cause" (or "magazine" here); a value the library
+     does not publish is left out and the gap is named, never filled in. */
+  shop: {
+    plug_reader: {
+      ref: "1984-1999 Softail Repair Manual, Ch. 3, p. 112 (Spark Plug Condition); install/cleaning notes p. 113. Sportster 1986-2003, p. 143 carries the same chart.",
+      plug: "5R6A",
+      gap: "0.038-0.043",
+      conditions: [
+        { name: "Normal", look: "Light tan or gray deposits on the firing tip.", cause: "A healthy plug — this is what right looks like.", action: "Leave it. Can be cleaned and returned to use.", see: "" },
+        { name: "Gap bridged", look: "Deposit buildup closing the gap between the electrodes.", cause: "Oil or carbon fouling.", action: "Clean if the deposits are not excessive; then find the fouling source below.", see: "" },
+        { name: "Carbon fouled", look: "Black, dry fluffy carbon deposits on insulator tips, exposed shell surfaces and electrodes.", cause: "Too cold a plug, weak ignition, dirty air cleaner, too rich a fuel mixture, or excessive idling.", action: "Clean the plug, then fix the rich mixture.", see: "Rich running / flooding tree (Diagnose tab)" },
+        { name: "Fused spot deposit", look: "Melted or spotty deposits resembling bubbles or blisters.", cause: "Sudden acceleration.", action: "Can be cleaned.", see: "" },
+        { name: "Lead fouled", look: "Dark gray, black, yellow, or tan deposits, or a fused glazed coating on the insulator tip.", cause: "Highly leaded gasoline.", action: "Can be cleaned.", see: "" },
+        { name: "Overheating", look: "White or light gray insulator with small black or gray-brown spots, and a bluish-burnt appearance of the electrodes.", cause: "Engine overheating, wrong type of fuel, loose spark plugs, too hot a plug, or incorrect ignition timing.", action: "Replace the plug; find the heat source — white reads lean.", see: "Lean idle / won't hold idle tree (Diagnose tab)" },
+        { name: "Oil fouled", look: "Wet black deposits on the insulator, shell bore and electrodes.", cause: "Excessive oil entering the combustion chamber through worn rings and pistons, excessive clearance between valve guides and stems, or worn or loose bearings.", action: "Can be cleaned. If the engine is not repaired, use a hotter plug.", see: "Compression test card (Diagnose tab) — wet test separates rings from valves" },
+        { name: "Worn electrodes", look: "Severely eroded or worn electrodes.", cause: "Normal wear.", action: "Replace the plug.", see: "" },
+        { name: "Preignition", look: "Melted electrodes and possibly a blistered insulator. Metallic deposits on the insulator indicate engine damage.", cause: "Wrong type of fuel, incorrect ignition timing or advance, too hot a plug, burned valves, or engine overheating.", action: "Replace the plug; check timing and valves before riding.", see: "Misfire / missing / hard starting when hot tree (Diagnose tab)" }
+      ],
+      notes: [
+        "Blow dirt out of the plug wells before removing plugs — dirt falling into the cylinders causes serious engine damage (Repair Manual p. 113).",
+        "Do NOT clean plugs with a sand-blast type device — abrasive left in the plug can fall into the engine (Repair Manual p. 113).",
+        "Gap new plugs with a wire gauge: correct gap feels like a slight drag as the wire pulls through. Put a small drop of oil or anti-seize on the threads (Repair Manual p. 113).",
+        "The Diagnose tab photo upload gives a rough color read from a photo; this card is the reference it reads against."
+      ]
+    },
+    wire_fuse: {
+      ref: "FSM #99482-98 §8 p. 8-1 (circuit breaker ratings); App. A Table 2, 1997 Main Harness Part No. 70216-96 (wire gauges); App. A p. A-20 (starter cable).",
+      breakers: [
+        { circuit: "Main", amps: 30 },
+        { circuit: "Ignition", amps: 15 },
+        { circuit: "Lights", amps: 15 },
+        { circuit: "Accessory", amps: 15 },
+        { circuit: "Instruments", amps: 15 }
+      ],
+      wires: [
+        { circuit: "Main circuit breaker feed", gauge: "12" },
+        { circuit: "Starter terminal / starter-to-breaker cable", gauge: "10" },
+        { circuit: "Starter relay terminals 30 / 87", gauge: "14" },
+        { circuit: "Fuse block positions 5-8", gauge: "14" },
+        { circuit: "Ignition module", gauge: "16" },
+        { circuit: "Harness grounds (under seat)", gauge: "16" },
+        { circuit: "Oil pressure sending unit", gauge: "18" },
+        { circuit: "Rear brake light switch", gauge: "18" },
+        { circuit: "Horn", gauge: "18" },
+        { circuit: "Starter relay terminals 85 / 86", gauge: "18" },
+        { circuit: "Fuse block positions 1-4", gauge: "18" },
+        { circuit: "Neutral switch", gauge: "18" },
+        { circuit: "Coil", gauge: "18" },
+        { circuit: "Taillight & rear turn signals", gauge: "18" }
+      ],
+      notes: [
+        "Evo Softails use circuit breakers, not fuses — the 'fuse block' in the harness table is the breaker block. If a breaker keeps tripping, find the short; never fit a bigger breaker.",
+        "The breaker protects the wire: the factory pairs the 30A main with 12 GA and the 15A circuits with 14/18 GA. Never upsize a breaker without upsizing the wire it feeds.",
+        "No generic AWG ampacity table is published in the garage library, so none is printed here — the factory pairings above are the reference. A generic ampacity chart would be a guess, not a citation."
+      ]
+    },
+    gear_ratio: {
+      ref: "FSM #99482-98 §6 p. 6-1 (sprockets + overall gear ratios); Clymer Table 1, Five-Speed Transmission Specifications (internal gear ratios + overall ratios by year); tire sizes: Sportster 1986-2003 Tables 10/12, pp. 497-498.",
+      stock: { comp: 25, clutch: 36, trans: 32, rear: 65 },
+      internal: [
+        { years: "1984-1993", gears: [3.24, 2.21, 1.60, 1.23, 1.00] },
+        { years: "1994", gears: [3.24, 2.21, 1.57, 1.23, 1.00], note: "Domestic 1st 3.24 / HDI 1st 3.21; domestic 3rd 1.57 / HDI 3rd 1.60" },
+        { years: "1995-1999", gears: [3.21, 2.21, 1.57, 1.23, 1.00] }
+      ],
+      overall: [
+        { years: "1997-1998 (FSM §6)", gears: [10.11, 6.96, 4.95, 3.86, 3.15] },
+        { years: "1995-1997 (Clymer)", gears: [10.41, 6.96, 4.95, 3.86, 3.15] },
+        { years: "1991-1992 (Clymer)", gears: [10.93, 7.46, 5.40, 4.15, 3.37] }
+      ],
+      flag: "The FSM §6 sprocket table (25/36/32/65) and its own overall-ratio table do NOT reconcile: 36/25 x 65/32 x 1.00 = 2.93 in 5th, not the printed 3.15. The printed overall ratios match a 70-tooth rear (36/25 x 70/32 = 3.15 in 5th; 3.21 x 1.44 x 70/32 = 10.11 in 1st). Clymer's 1995-1997 1st (10.41) also disagrees with the FSM's 10.11. Count the teeth on your own bike — the calculator uses what you enter, not the book's tables.",
+      tire_presets: [
+        { label: "Sportster rear 130/90-16 (1991-2003, Dunlop D401)", section_mm: 130, aspect: 90, rim_in: 16, dia_in: 25.21 },
+        { label: "Sportster front 100/90-19 (1991-2003, Dunlop D401)", section_mm: 100, aspect: 90, rim_in: 19, dia_in: 26.09 }
+      ],
+      tire_note: "Diameters are computed from the published sizes (rim + 2 x section x aspect), not measured. No Softail stock tire-size table was found in the library — measure your own rear tire (rollout: mark the tire and the ground, roll one full turn, measure) and enter its diameter."
+    },
+    tap_drill: {
+      ref: "Inch: 1984-1999 Softail Repair Manual, Table 7 (American Tap Drill Sizes), p. 32 — read visually Nov 25, 2026. Metric: Clymer HD Evolution 1984-1998, Table 11 (American Tap and Drill Sizes), pp. 33-34 — read visually Nov 25, 2026.",
+      inch: [
+        { thread: "#0-80", drill: "3/64" }, { thread: "#1-64", drill: "No. 53" }, { thread: "#1-72", drill: "No. 53" },
+        { thread: "#2-56", drill: "No. 51" }, { thread: "#2-64", drill: "No. 50" }, { thread: "#3-48", drill: "5/64" },
+        { thread: "#3-56", drill: "No. 46" }, { thread: "#4-40", drill: "No. 43" }, { thread: "#4-48", drill: "No. 42" },
+        { thread: "#5-40", drill: "No. 39" }, { thread: "#5-44", drill: "No. 37" }, { thread: "#6-32", drill: "No. 36" },
+        { thread: "#6-40", drill: "No. 33" }, { thread: "#8-32", drill: "No. 29" }, { thread: "#8-36", drill: "No. 29" },
+        { thread: "#10-24", drill: "No. 25" }, { thread: "#10-32", drill: "No. 21" }, { thread: "#12-24", drill: "No. 17" },
+        { thread: "#12-28", drill: "No. 15" }, { thread: "1/4-20", drill: "No. 8" }, { thread: "1/4-28", drill: "No. 3" },
+        { thread: "5/16-18", drill: "F" }, { thread: "5/16-24", drill: "I" }, { thread: "3/8-16", drill: "5/16" },
+        { thread: "3/8-24", drill: "Q" }, { thread: "7/16-14", drill: "U" }, { thread: "7/16-20", drill: "W" },
+        { thread: "1/2-13", drill: "27/64" }, { thread: "1/2-20", drill: "29/64" }, { thread: "9/16-12", drill: "31/64" },
+        { thread: "9/16-18", drill: "33/64" }, { thread: "5/8-11", drill: "17/32" }, { thread: "5/8-18", drill: "37/64" },
+        { thread: "3/4-10", drill: "21/32" }, { thread: "3/4-16", drill: "11/16" }, { thread: "7/8-9", drill: "49/64" },
+        { thread: "7/8-14", drill: "13/16" }, { thread: "1-8", drill: "7/8" }, { thread: "1-14", drill: "15/16" }
+      ],
+      metric: [
+        { thread: "3x0.50", drill: "No. 39", decimal: "0.0995", fraction: "3/32" },
+        { thread: "3x0.60", drill: "3/32", decimal: "0.0937", fraction: "3/32" },
+        { thread: "4x0.70", drill: "No. 30", decimal: "0.1285", fraction: "1/8" },
+        { thread: "4x0.75", drill: "1/8", decimal: "0.125", fraction: "1/8" },
+        { thread: "5x0.80", drill: "No. 19", decimal: "0.166", fraction: "11/64" },
+        { thread: "5x0.90", drill: "No. 20", decimal: "0.161", fraction: "5/32" },
+        { thread: "6x1.00", drill: "No. 9", decimal: "0.196", fraction: "13/64" },
+        { thread: "7x1.00", drill: "15/64", decimal: "0.234", fraction: "15/64" },
+        { thread: "8x1.00", drill: "J", decimal: "0.277", fraction: "9/32" },
+        { thread: "8x1.25", drill: "17/64", decimal: "0.265", fraction: "17/64" },
+        { thread: "9x1.00", drill: "5/16", decimal: "0.3125", fraction: "5/16" },
+        { thread: "9x1.25", drill: "5/16", decimal: "0.3125", fraction: "5/16" },
+        { thread: "10x1.25", drill: "11/32", decimal: "0.3437", fraction: "11/32" },
+        { thread: "10x1.50", drill: "R", decimal: "0.339", fraction: "11/32" },
+        { thread: "11x1.50", drill: "3/8", decimal: "0.375", fraction: "3/8" },
+        { thread: "12x1.50", drill: "13/32", decimal: "0.406", fraction: "13/32" },
+        { thread: "12x1.75", drill: "13/32", decimal: "0.406", fraction: "13/32" }
+      ],
+      notes: [
+        "Clymer misprints the 7x1.00 drill-equivalent column as '16/64' — the decimal (0.234) and nearest-fraction (15/64) columns agree on 15/64, so 15/64 is printed here and the 16/64 is never used.",
+        "The Repair Manual lists 1/4-20 as No. 8; some generic charts say No. 7. The manual is the source here — use No. 8 when you are working from this book.",
+        "If you have to drill and tap a hole, refer to Table 7 (Repair Manual Ch. 1, p. 24)."
+      ]
+    },
+    bolt_id: {
+      ref: "Thread series: 1984-1999 Softail Repair Manual Table 7, p. 32 (inch) and Clymer Table 11, pp. 33-34 (metric). Numbered-screw diameters are the standard gauge definition (0.060 in + 0.013 in per gauge number).",
+      how: "Measure the major diameter with calipers (across the threads, not the shank). For SAE, count the threads in 1/2 in and double it — that is the threads-per-inch. For metric, measure the distance between two adjacent thread crests in mm — that is the pitch. Match both numbers below; a diameter alone never identifies a thread.",
+      sae: [
+        { thread: "#0-80", dia_in: 0.06, tpi: 80 }, { thread: "#1-64", dia_in: 0.073, tpi: 64 }, { thread: "#1-72", dia_in: 0.073, tpi: 72 },
+        { thread: "#2-56", dia_in: 0.086, tpi: 56 }, { thread: "#2-64", dia_in: 0.086, tpi: 64 }, { thread: "#3-48", dia_in: 0.099, tpi: 48 },
+        { thread: "#3-56", dia_in: 0.099, tpi: 56 }, { thread: "#4-40", dia_in: 0.112, tpi: 40 }, { thread: "#4-48", dia_in: 0.112, tpi: 48 },
+        { thread: "#5-40", dia_in: 0.125, tpi: 40 }, { thread: "#5-44", dia_in: 0.125, tpi: 44 }, { thread: "#6-32", dia_in: 0.138, tpi: 32 },
+        { thread: "#6-40", dia_in: 0.138, tpi: 40 }, { thread: "#8-32", dia_in: 0.164, tpi: 32 }, { thread: "#8-36", dia_in: 0.164, tpi: 36 },
+        { thread: "#10-24", dia_in: 0.19, tpi: 24 }, { thread: "#10-32", dia_in: 0.19, tpi: 32 }, { thread: "#12-24", dia_in: 0.216, tpi: 24 },
+        { thread: "#12-28", dia_in: 0.216, tpi: 28 }, { thread: "1/4-20", dia_in: 0.25, tpi: 20 }, { thread: "1/4-28", dia_in: 0.25, tpi: 28 },
+        { thread: "5/16-18", dia_in: 0.3125, tpi: 18 }, { thread: "5/16-24", dia_in: 0.3125, tpi: 24 }, { thread: "3/8-16", dia_in: 0.375, tpi: 16 },
+        { thread: "3/8-24", dia_in: 0.375, tpi: 24 }, { thread: "7/16-14", dia_in: 0.4375, tpi: 14 }, { thread: "7/16-20", dia_in: 0.4375, tpi: 20 },
+        { thread: "1/2-13", dia_in: 0.5, tpi: 13 }, { thread: "1/2-20", dia_in: 0.5, tpi: 20 }, { thread: "9/16-12", dia_in: 0.5625, tpi: 12 },
+        { thread: "9/16-18", dia_in: 0.5625, tpi: 18 }, { thread: "5/8-11", dia_in: 0.625, tpi: 11 }, { thread: "5/8-18", dia_in: 0.625, tpi: 18 },
+        { thread: "3/4-10", dia_in: 0.75, tpi: 10 }, { thread: "3/4-16", dia_in: 0.75, tpi: 16 }, { thread: "7/8-9", dia_in: 0.875, tpi: 9 },
+        { thread: "7/8-14", dia_in: 0.875, tpi: 14 }, { thread: "1-8", dia_in: 1.0, tpi: 8 }, { thread: "1-14", dia_in: 1.0, tpi: 14 }
+      ],
+      metric: [
+        { thread: "M3x0.50", dia_mm: 3, pitch: 0.5 }, { thread: "M3x0.60", dia_mm: 3, pitch: 0.6 },
+        { thread: "M4x0.70", dia_mm: 4, pitch: 0.7 }, { thread: "M4x0.75", dia_mm: 4, pitch: 0.75 },
+        { thread: "M5x0.80", dia_mm: 5, pitch: 0.8 }, { thread: "M5x0.90", dia_mm: 5, pitch: 0.9 },
+        { thread: "M6x1.00", dia_mm: 6, pitch: 1.0 }, { thread: "M7x1.00", dia_mm: 7, pitch: 1.0 },
+        { thread: "M8x1.00", dia_mm: 8, pitch: 1.0 }, { thread: "M8x1.25", dia_mm: 8, pitch: 1.25 },
+        { thread: "M9x1.00", dia_mm: 9, pitch: 1.0 }, { thread: "M9x1.25", dia_mm: 9, pitch: 1.25 },
+        { thread: "M10x1.25", dia_mm: 10, pitch: 1.25 }, { thread: "M10x1.50", dia_mm: 10, pitch: 1.5 },
+        { thread: "M11x1.50", dia_mm: 11, pitch: 1.5 }, { thread: "M12x1.50", dia_mm: 12, pitch: 1.5 },
+        { thread: "M12x1.75", dia_mm: 12, pitch: 1.75 }
+      ]
+    },
+    oil: {
+      ref: "FSM #99482-98 §1, p. 1-9 (Fluid Requirements — Engine Oil).",
+      rule: "Always use the proper grade of oil for the lowest temperature expected before next scheduled oil change.",
+      grades: [
+        { type: "HD Multi-grade", viscosity: "SAE 10W40", hd_rating: "HD 240", lowest_temp: "Below 40°F (4°C)", cold_start: "Excellent" },
+        { type: "HD Multi-grade", viscosity: "SAE 20W50", hd_rating: "HD 240", lowest_temp: "Above 40°F (4°C)", cold_start: "Good" },
+        { type: "HD Regular Heavy", viscosity: "SAE 50", hd_rating: "HD 240", lowest_temp: "Above 60°F (16°C)", cold_start: "Poor" },
+        { type: "HD Extra Heavy", viscosity: "SAE 60", hd_rating: "HD 240", lowest_temp: "Above 80°F (27°C)", cold_start: "Poor" }
+      ],
+      diesel: "If H-D oil is not available, use an oil certified for diesel engines — acceptable designations CE, CF, CF-4, and CG-4. Preferred viscosities for the diesel oils, in descending order: 20W-50, 15W-40, 10W-40. At the first opportunity, see a dealer to change back to 100 percent H-D oil.",
+      service: "Oil tank 3.0 qt with filter; service at 500 mi, then every 5,000 mi (FSM §1 / §2)."
+    },
+    compression_ratio: {
+      ref: "1984-1999 Softail Repair Manual, Table 1 (General Engine Specifications), Ch. 5 p. 179; Sportster 1986-2003, Table 1 (General Engine Specifications), p. 193.",
+      stock: [
+        { model: "Evo Big Twin 1340", bore_in: 3.498, stroke_in: 4.25, disp_cid: 81.6, disp_cc: 1340, cr: 9.5, chamber_cc_derived: 78.7 },
+        { model: "Sportster 883", bore_in: 3.0, stroke_in: 3.812, disp_cid: 53.9, disp_cc: 883, cr: 9.0, chamber_cc_derived: 55.2 },
+        { model: "Sportster 1100", bore_in: 3.35, stroke_in: 3.812, disp_cid: 67.2, disp_cc: 1102, cr: 9.0, chamber_cc_derived: 68.8 },
+        { model: "Sportster 1200", bore_in: 3.498, stroke_in: 3.812, disp_cid: 73.3, disp_cc: 1203, cr: 9.0, chamber_cc_derived: 75.0 },
+        { model: "Sportster 1200S (1998-2003)", bore_in: 3.498, stroke_in: 3.812, disp_cid: 73.3, disp_cc: 1203, cr: 10.0, chamber_cc_derived: 66.7 }
+      ],
+      note: "Chamber volumes are DERIVED arithmetic (swept volume / (ratio - 1)), not published figures — the manuals publish bore, stroke, displacement and ratio, never a chamber volume. Measure your own chamber with a burette and enter it; the derived numbers are only a sanity check for a stock motor."
+    },
+    carb_cfm: {
+      ref: "Displacement: 1984-1999 Softail Repair Manual, Table 1, Ch. 5 p. 179 (81.6 cu. in.). Formula: CFM = CID x RPM x VE / 3456 (standard volumetric-efficiency formula).",
+      stock_disp_cid: 81.6,
+      carb: "Keihin CV40, 40 mm bore",
+      note: "No published CFM flow rating for the CV40 exists in the garage library — this calculator answers what the ENGINE needs at a given rpm and volumetric efficiency, not what the carb flows. VE is your assumption, not a spec: a stock street Evo is usually figured around 80-85%, a built motor higher. Enter your own VE and the number follows."
+    },
+    sag: {
+      ref: "FSM #99482-98 §2, p. 2-73 (Rear Shock Absorbers — Adjustment); Easyriders ER_401 §113-§114 (Progressive adjustable shocks, magazine).",
+      procedure: [
+        "Loosen the locknuts.",
+        "Use the spanner wrench, Part No. 94455-89, and extend or compress the springs to the rider's desired position. Mark the adjuster plates so you adjust both springs to the same position.",
+        "Turning the adjuster plates OUT (toward the locknut) increases the spring preload to carry a heavier load. Turning them IN (away from the locknut) decreases the spring preload to carry a lighter load.",
+        "Tighten the locknuts against the adjuster plates.",
+        "Shock absorber bolts: 115-130 ft-lbs (156-176 Nm). The rear shock absorber is not repairable — if damaged, replace it."
+      ],
+      magazine: "Progressive adjustable shocks ship with the preload at their lightest setting; rotate the spring seat counter-clockwise to increase preload (Easyriders ER_401 §114, magazine — aftermarket shocks, not a factory spec).",
+      measure: "Measure from the axle to a fixed point on the fender, straight up. First with the bike on a stand, wheel off the ground (unloaded). Then with the bike on the ground, you sitting on it in riding gear, feet on the pegs, a friend holding the bike upright (loaded). Sag is unloaded minus loaded — front and rear, separately.",
+      no_target: "No factory sag target is published anywhere in the garage library — not in the FSM, not in Clymer, not in the magazines. This card records your measurements and the preload change you made; it does not print a target number, because there is none to cite. Set it by the FSM procedure above and by feel; if you know a target you trust, write it in the notes field, not as a factory number."
+    },
+    interchange: {
+      ref: "Harley SIP factory parts catalogs + Ronnie's HLSM fiche; factory bulletin P-20 (Nov 18, 1991); FSM #99482-98 §8; Sportster 1986-2003; 1984-1999 Softail Repair Manual pp. 138-139; Easyriders ER_262 §145 and ER_305 §18 (magazine).",
+      rows: [
+        { part: "Wheel bearing 9052 (race 9033)", fits: "Big Twins and Sportsters, 1973-99 — two per wheel", note: "The same bearing front and rear.", source: "Harley SIP factory parts catalogs; Ronnie's HLSM fiche" },
+        { part: "Brake pads 44063-83C/D", fits: "All XL / FX / FL, 1984-99", note: "Pads are done at 1/16 in.", source: "Factory bulletin P-20 (Nov 18, 1991)" },
+        { part: "Points ignition backup (breaker plate + mechanical advance + ignition cam)", fits: "Older Harley points parts bolt into late-model Evolution engines", note: "A mechanical backup for a failed electronic module.", source: "NOT an FSM cause — Easyriders ER_262 §145 (magazine interchange tip)" },
+        { part: "Stator", fits: "DOES NOT interchange — Big Twin 29970-88C vs Sportster 29967-89C", note: "Different part, different output. Check the number before you buy.", source: "FSM #99482-98 §8; Sportster 1986-2003" },
+        { part: "Regulator", fits: "DOES NOT interchange — Big Twin 74519-88A vs Sportster 74523-94A", note: "Different part. Check the number before you buy.", source: "FSM #99482-98 §8; Sportster 1986-2003" },
+        { part: "Cylinder head bolts; rocker boxes and gaskets", fits: "NOT interchangeable between certain model years", note: "Buy for your Harley's model year — the manual warns twice.", source: "1984-1999 Softail Repair Manual, pp. 138-139" },
+        { part: "Starter jackshaft 31482-70", fits: "~1/4 in longer than the shaft it replaces", note: "A longer shaft fixes a starter that spins without engaging.", source: "NOT an FSM cause — Easyriders ER_305 §18 (magazine)" }
+      ]
+    },
+    preride: {
+      ref: "Clymer HD Evolution 1984-1998, Ch. 3, p. 74 (Routine Safety Checks — Pre-Ride Inspection); Sportster 1986-2003, Ch. 3, pp. 113-114 (same list plus chain, fasteners, and the Lights-and-Horn detail).",
+      structure_note: "Grouped under the MSF T-CLOCS headings — the headings are the MSF's published pre-ride framework; every check under them is from Clymer / Sportster as cited per group.",
+      groups: [
+        { letter: "T", title: "Tires & wheels", items: ["Check wheel and tire condition. Check tire pressure — Dunlop cold pressures are on the Torque tab (FLSTC 36/36 solo, 36/40 two-up; FXSTC 30/36 solo, 30/40 two-up)."], source: "Clymer Ch. 3 item 1" },
+        { letter: "C", title: "Controls", items: ["Check the operation of the front and rear brakes.", "Check clutch operation; adjust the clutch if necessary.", "Check throttle operation — it should move smoothly and return quickly when released; adjust throttle free play if necessary."], source: "Clymer Ch. 3 items 5-7" },
+        { letter: "L", title: "Lights & electrics", items: ["Make sure all lights work."], source: "Clymer Ch. 3 item 2", sub_title: "Lights and horn — check each one (ignition on)", sub_items: ["Pull the front brake lever — brake light works.", "Push the rear brake pedal — brake light works.", "Headlight and taillight work.", "Dimmer switch high and low — both headlight elements work.", "Turn signal switch left and right — all four signals work.", "Accessory lights work, if fitted.", "Horn button works.", "If any light or the horn fails, see the Lights tree on the Diagnose tab."], sub_source: "Sportster Ch. 3, p. 114" },
+        { letter: "O", title: "Oil, fuel & fluids", items: ["Check engine, transmission and primary chaincase for oil leakage; add oil if necessary.", "Check brake fluid level and condition; add fluid if necessary. DOT 5 silicone ONLY.", "Inspect the fuel system for leaks.", "Check the fuel level in the fuel tank."], source: "Clymer Ch. 3 items 3, 4, 10, 11" },
+        { letter: "C", title: "Chassis", items: ["Inspect the front and rear suspension — solid feel, no looseness.", "Check the exhaust system for leaks or damage.", "Check drive belt tension — Big Twin 3/8-1/2 in.", "Check the tightness of exposed fasteners. CAUTION: do not check the cylinder head bolts without following the Chapter 4 procedure."], source: "Clymer Ch. 3 items 8, 9, 12; fastener item + caution: Sportster Ch. 3, p. 114" },
+        { letter: "S", title: "Stands", items: [], note: "No stand check in the Clymer pre-ride list. The FSM covers the jiffy stand as a service item (§2 p. 2-82), not a pre-ride check — so no stand item is printed here rather than an invented one.", source: "FSM #99482-98 §2, p. 2-82" }
+      ]
+    }
+  }
 };
 if (typeof module !== "undefined") module.exports = ED_DATA;
