@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="1990">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Evo Diagnostic — Pocket Garage</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#070709">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .ed-wrap{max-width:860px;margin:0 auto;padding:0 14px 90px}
+  .ed-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
+  .ed-tab{padding:9px 13px;border:1px solid var(--chrome,#888);border-radius:8px;background:#111;color:#eee;cursor:pointer;font:inherit}
+  .ed-tab[aria-selected="true"]{background:var(--purple,#9d6bff);color:#070709;border-color:var(--purple,#9d6bff)}
+  .ed-panel{display:none}
+  .ed-panel.active{display:block}
+  .ed-card{border:1px solid #333;border-radius:10px;padding:14px;margin:12px 0;background:#0d0d10}
+  .ed-card h3{margin:0 0 8px}
+  .ed-btn{padding:10px 16px;border-radius:8px;border:1px solid var(--purple,#9d6bff);background:var(--purple,#9d6bff);color:#070709;font:inherit;cursor:pointer;margin:4px 6px 4px 0}
+  .ed-btn.ghost{background:transparent;color:#eee;border-color:#555}
+  .ed-cause{border-left:4px solid var(--purple,#9d6bff);padding:8px 10px;margin:8px 0;background:#141419}
+  .ed-cause.critical{border-left-color:#e5484d}
+  .ed-cause.high{border-left-color:#f5a524}
+  .ed-verdict{font-size:1.15em;font-weight:700;padding:10px;border-radius:8px;margin:10px 0}
+  .ed-verdict.no{background:#3a0d0d;color:#ffb4b4}
+  .ed-verdict.soon{background:#3a2c05;color:#ffe1a1}
+  .ed-verdict.ok{background:#0d2b12;color:#b4ffc4}
+  .ed-photo{max-width:100%;border-radius:8px}
+  .ed-thumb{width:100%;border-radius:8px;display:block}
+  .ed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .ed-credit{font-size:.8em;color:#999}
+  .ed-mono{font-family:monospace}
+  .ed-big{font-size:2.2em;font-weight:700}
+  .ed-note{color:#bbb;font-size:.92em}
+  .ed-tree-btn{display:block;width:100%;text-align:left;padding:12px;margin:6px 0;border:1px solid #444;border-radius:8px;background:#141419;color:#eee;font:inherit;cursor:pointer}
+  .ed-tree-btn:hover{border-color:var(--purple,#9d6bff)}
+  select,input[type=text]{font:inherit;padding:9px;border-radius:8px;border:1px solid #555;background:#111;color:#eee;width:100%;box-sizing:border-box}
+  label{display:block;margin:10px 0 4px;font-weight:600}
+  .ed-meter{height:14px;background:#222;border-radius:7px;overflow:hidden}
+  .ed-meter>div{height:100%;background:var(--purple,#9d6bff)}
+  .ed-part{cursor:pointer}
+  .ed-part:hover rect,.ed-part:hover polygon{stroke:var(--purple,#9d6bff);stroke-width:3}
+  .ed-part:hover text{fill:#fff}
+  video.ed-clip{max-width:100%;border-radius:8px}
+  .ed-bar-row{display:flex;align-items:center;gap:8px;margin:4px 0}
+  .ed-bar-row .ed-bar-label{flex:0 0 45%}
+  .ed-bar-row .ed-bar-track{flex:1;height:10px;background:#222;border-radius:5px;overflow:hidden}
+  .ed-bar-row .ed-bar-track>div{height:100%;background:var(--purple,#9d6bff)}
+  /* House buttons jump 2px on :hover — on a touch-first app that shift sticks after a tap and looks broken. Hold our buttons still. */
+  .ed-btn:hover, .ed-tree-btn:hover, .ed-tab:hover { transform: none !important; }
+</style>
+</head>
+<body>
+<div class="ed-wrap">
+  <header>
+    <p class="ed-note">Pocket Garage &middot; Shop Sheet N&ordm; 8</p>
+    <h1>The Evo Diagnostic</h1>
+    <p class="ed-note">Photo, video and sound diagnostics for Evo-era Harleys. Guided trees from the factory manuals, parts ID from a traced atlas, idle RPM from sound, VIN decode. Offline-first. No account. The app ranks possibilities and names the confirming test &mdash; it never declares a verdict from a photo or sound alone.</p>
+    <label for="bike">Bike</label>
+    <select id="bike"></select>
+  </header>
+
+  <nav class="ed-tabs" role="tablist">
+    <button class="ed-tab" role="tab" data-tab="diagnose" aria-selected="true">Diagnose</button>
+    <button class="ed-tab" role="tab" data-tab="atlas" aria-selected="false">Atlas</button>
+    <button class="ed-tab" role="tab" data-tab="listen" aria-selected="false">Listen</button>
+    <button class="ed-tab" role="tab" data-tab="vin" aria-selected="false">VIN</button>
+    <button class="ed-tab" role="tab" data-tab="recalls" aria-selected="false">Recalls</button>
+    <button class="ed-tab" role="tab" data-tab="torque" aria-selected="false">Torque</button>
+    <button class="ed-tab" role="tab" data-tab="data" aria-selected="false">Data</button>
+  </nav>
+
+  <section class="ed-panel active" id="panel-diagnose">
+    <div id="tree-list"></div>
+    <div id="session" style="display:none">
+      <div class="ed-card">
+        <h3 id="session-title"></h3>
+        <p class="ed-note" id="session-testcase"></p>
+        <label for="photo">Photo of the problem (optional — helps you, the app never judges from it alone)</label>
+        <input type="file" id="photo" accept="image/*" capture="environment">
+        <div id="photo-preview"></div>
+        <div id="tree-step"></div>
+      </div>
+      <div class="ed-card" id="results" style="display:none"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Add another bike</h3>
+      <p class="ed-note">The app starts with Joshua&rsquo;s three bikes. Any rider can add theirs — pick from 106 common models or type a name. Specs stay labeled Evo 1340; the app never invents a spec for a bike it doesn&rsquo;t know.</p>
+      <label for="add-bike-model">Common models</label>
+      <select id="add-bike-model"></select>
+      <label for="add-bike-name">Or a name of your own</label>
+      <input type="text" id="add-bike-name" placeholder="e.g. 1998 Sportster 1200S">
+      <button class="ed-btn" id="add-bike-btn">Add bike</button>
+      <p class="ed-note" id="add-bike-status"></p>
+    </div>
+    <div class="ed-card">
+      <h3>Flash codes — 1998 Sportster XL1200S only</h3>
+      <p class="ed-note">The fuel-injected 1200S is the only Evo-era Harley that stores trouble codes and flashes them out on the check-engine lamp. Carbed Evos have no check-engine lamp and store no codes.</p>
+      <label for="flash-input">Code (count the flashes)</label>
+      <input type="text" id="flash-input" placeholder="e.g. 12" maxlength="2" inputmode="numeric">
+      <button class="ed-btn" id="flash-lookup">Look up the code</button>
+      <div id="flash-result"></div>
+      <p class="ed-note">How to read them: jumper wire across pins 1 and 2 of Data Link connector [91A], key to IGNITION, wait about 8 seconds. Rapid flashes (about 3/sec) = intermission, then a 2-second pause; count the flashes for the first digit, 2-second pause, count the second digit. Source: Sportster XLH 1998 Service Manual 99484-98, pp. 7-15 to 7-17.</p>
+    </div>
+    <div class="ed-card">
+      <h3>Tire date</h3>
+      <p class="ed-note">Read the DOT date code off the sidewall — the last four digits of the Tire Identification Number (week + year). Pre-2000 tires use three digits. The full TIN is only on one sidewall; check the inboard side if it is not outside.</p>
+      <label for="tire-input">Date code (3 or 4 digits)</label>
+      <input type="text" id="tire-input" placeholder="e.g. 2319" maxlength="4" inputmode="numeric">
+      <button class="ed-btn" id="tire-lookup">How old is this tire?</button>
+      <div id="tire-result"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Battery &amp; charging — test it in order</h3>
+      <p class="ed-note">From FSM #99482-98 §8. Battery first, then stator, then regulator — a dead battery makes every other reading lie. You need a multimeter, and a load tester for step 2.</p>
+      <div id="charging-tests"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Compression test — guided</h3>
+      <p class="ed-note">From FSM #99482-98 §3, pp. 3-11–3-12. Tool: Cylinder Compression Gauge Part No. HD-33223-1, screw-in type adapter. Warm engine, both plugs out, throttle wide open — a cold engine or a closed throttle makes the readings lie.</p>
+      <div id="compression-tests"></div>
+    </div>
+  </section>
+
+  <section class="ed-panel" id="panel-atlas">
+    <div class="ed-card">
+      <h3>Atlas — generic layer</h3>
+      <p class="ed-note">Stock reference photos (Creative Commons, credited below) plus your own bikes&rsquo; photos when you add them. Your bike&rsquo;s photos are the ground truth — a stock Fat Boy can&rsquo;t show your bobber.</p>
+      <div class="ed-grid" id="cc-grid"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Tap a part</h3>
+      <p class="ed-note">Tap any labeled box on the diagrams below — the part&rsquo;s name, what it does, its spec, and how it usually fails.</p>
+      <div id="part-detail"><p class="ed-note">Nothing selected yet.</p></div>
+    </div>
+    <div class="ed-card">
+      <h3>CV40 carburetor — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from the 1984&ndash;1999 Softail Repair Manual and the factory parts fiche. A simplified schematic, not a factory diagram. Key serviceable parts labeled — tap one.</p>
+      <svg viewBox="0 0 420 300" width="100%" role="img" aria-label="Simplified CV40 carburetor schematic">
+        <g class="ed-part" data-part="slide"><rect x="150" y="40" width="120" height="70" rx="8" fill="#1a1a20" stroke="#9d6bff" stroke-width="2"/>
+        <text x="210" y="78" fill="#eee" text-anchor="middle" font-size="13">Slide + diaphragm</text></g>
+        <g class="ed-part" data-part="carb-body"><rect x="130" y="110" width="160" height="80" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/>
+        <text x="210" y="140" fill="#eee" text-anchor="middle" font-size="13">Carb body (CV40)</text>
+        <text x="210" y="162" fill="#bbb" text-anchor="middle" font-size="11">Main jet 185 &middot; Pilot 45</text></g>
+        <g class="ed-part" data-part="float-bowl"><rect x="150" y="190" width="120" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/>
+        <text x="210" y="212" fill="#eee" text-anchor="middle" font-size="13">Float bowl</text>
+        <text x="210" y="230" fill="#bbb" text-anchor="middle" font-size="11">Float 0.413&ndash;0.453 in</text></g>
+        <g class="ed-part" data-part="enrichener"><line x1="210" y1="110" x2="330" y2="60" stroke="#9d6bff" stroke-width="1.5"/>
+        <text x="335" y="55" fill="#9d6bff" font-size="12">Enrichener</text></g>
+        <g class="ed-part" data-part="mixture-screw"><line x1="290" y1="140" x2="360" y2="130" stroke="#9d6bff" stroke-width="1.5"/>
+        <text x="362" y="126" fill="#9d6bff" font-size="12">Mixture screw</text></g>
+        <g class="ed-part" data-part="accel-pump"><line x1="290" y1="165" x2="360" y2="180" stroke="#9d6bff" stroke-width="1.5"/>
+        <text x="362" y="176" fill="#9d6bff" font-size="12">Accelerator pump</text></g>
+        <g class="ed-part" data-part="rubber-plug"><line x1="150" y1="215" x2="80" y2="240" stroke="#9d6bff" stroke-width="1.5"/>
+        <text x="76" y="236" fill="#9d6bff" font-size="12" text-anchor="end">Rubber plug</text>
+        <text x="76" y="252" fill="#bbb" font-size="11" text-anchor="end">(idle jet feeds thru it)</text></g>
+        <g class="ed-part" data-part="main-jet"><rect x="95" y="250" width="75" height="24" rx="6" fill="#1a1a20" stroke="#9d6bff" stroke-width="1.5"/><text x="132" y="266" fill="#eee" text-anchor="middle" font-size="11">Main jet 185</text></g>
+        <g class="ed-part" data-part="pilot-jet"><rect x="180" y="250" width="75" height="24" rx="6" fill="#1a1a20" stroke="#9d6bff" stroke-width="1.5"/><text x="217" y="266" fill="#eee" text-anchor="middle" font-size="11">Pilot jet 45</text></g>
+        <g class="ed-part" data-part="float"><rect x="265" y="250" width="60" height="24" rx="6" fill="#1a1a20" stroke="#9d6bff" stroke-width="1.5"/><text x="295" y="266" fill="#eee" text-anchor="middle" font-size="11">Float</text></g>
+        <g class="ed-part" data-part="intake-seals"><rect x="330" y="250" width="80" height="24" rx="6" fill="#1a1a20" stroke="#9d6bff" stroke-width="1.5"/><text x="370" y="266" fill="#eee" text-anchor="middle" font-size="11">Intake seals</text></g>
+        <text x="210" y="285" fill="#bbb" text-anchor="middle" font-size="11">Keihin CV40 — 1990 49-state baseline, Repair Manual</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Ignition — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from FSM #99482-98 §8. A simplified schematic, not a factory diagram.</p>
+      <svg viewBox="0 0 420 210" width="100%" role="img" aria-label="Simplified ignition schematic">
+        <g class="ed-part" data-part="battery"><rect x="10" y="80" width="80" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="50" y="100" fill="#eee" text-anchor="middle" font-size="12">Battery</text><text x="50" y="118" fill="#bbb" text-anchor="middle" font-size="11">12V 18Ah</text></g>
+        <g class="ed-part" data-part="ignition-module"><rect x="120" y="80" width="100" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="170" y="100" fill="#eee" text-anchor="middle" font-size="12">Ignition module</text><text x="170" y="118" fill="#bbb" text-anchor="middle" font-size="11">20° BTDC</text></g>
+        <g class="ed-part" data-part="coil"><rect x="250" y="80" width="70" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="285" y="100" fill="#eee" text-anchor="middle" font-size="12">Coil</text><text x="285" y="118" fill="#bbb" text-anchor="middle" font-size="11">2.5–3.1 Ω</text></g>
+        <g class="ed-part" data-part="plugs"><rect x="350" y="80" width="60" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="380" y="100" fill="#eee" text-anchor="middle" font-size="12">Plugs</text><text x="380" y="118" fill="#bbb" text-anchor="middle" font-size="11">5R6A</text></g>
+        <line x1="90" y1="105" x2="120" y2="105" stroke="#9d6bff" stroke-width="2"/><line x1="220" y1="105" x2="250" y2="105" stroke="#9d6bff" stroke-width="2"/><line x1="320" y1="105" x2="350" y2="105" stroke="#9d6bff" stroke-width="2"/>
+        <g class="ed-part" data-part="plug-wires"><text x="335" y="68" fill="#9d6bff" font-size="12" text-anchor="middle">Plug wires</text></g>
+        <g class="ed-part" data-part="voes"><rect x="120" y="160" width="100" height="36" rx="8" fill="#1a1a20" stroke="#9d6bff" stroke-width="2"/><text x="170" y="175" fill="#eee" text-anchor="middle" font-size="12">VOES</text><text x="170" y="190" fill="#bbb" text-anchor="middle" font-size="11">closes 3.5–4.5 inHg</text></g>
+        <line x1="170" y1="160" x2="170" y2="130" stroke="#9d6bff" stroke-width="1.5"/>
+        <text x="210" y="30" fill="#bbb" text-anchor="middle" font-size="11">Plug gap 0.038–0.043 in · Dyna 2000i coil 2.5–3.5 Ω</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Charging — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from FSM #99482-98 §8. A simplified schematic, not a factory diagram.</p>
+      <svg viewBox="0 0 420 170" width="100%" role="img" aria-label="Simplified charging schematic">
+        <g class="ed-part" data-part="stator"><rect x="10" y="60" width="110" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="65" y="80" fill="#eee" text-anchor="middle" font-size="12">Stator 29970-88C</text><text x="65" y="98" fill="#bbb" text-anchor="middle" font-size="11">16–20 VAC / 1000 rpm</text></g>
+        <g class="ed-part" data-part="regulator"><rect x="160" y="60" width="110" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="215" y="80" fill="#eee" text-anchor="middle" font-size="12">Regulator 74519-88A</text><text x="215" y="98" fill="#bbb" text-anchor="middle" font-size="11">14.3–14.7V @ 3600 rpm</text></g>
+        <g class="ed-part" data-part="battery"><rect x="310" y="60" width="100" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="360" y="80" fill="#eee" text-anchor="middle" font-size="12">Battery</text><text x="360" y="98" fill="#bbb" text-anchor="middle" font-size="11">12V 18Ah · 32A</text></g>
+        <line x1="120" y1="85" x2="160" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="270" y1="85" x2="310" y2="85" stroke="#9d6bff" stroke-width="2"/>
+        <text x="210" y="30" fill="#bbb" text-anchor="middle" font-size="11">Stator 0.1–0.2 Ω lead-to-lead · Sportster stator 29967-89C, regulator 74523-94A</text>
+        <text x="210" y="145" fill="#9d6bff" text-anchor="middle" font-size="12">Test order: battery → stator → regulator</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Starting system — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from FSM #99482-98 §5, Fig. 5-1 &ldquo;Softail Starting Circuit&rdquo; (§5 p. 5-2). A simplified schematic, not a factory diagram. Turn-signal and stop-light switches and the circuit-protection block from the factory figure are left out. Relay terminals 30/87/85/86 per the relay test (FSM §5 p. 5-10). Wire colors (30=R/BK, 87=GN, 85/86=BK and BK/R) come from the connector table (FSM App. A p. A-20), not from the wiring diagram — they are not shown here. Tap the starter box.</p>
+      <svg viewBox="0 0 420 330" width="100%" role="img" aria-label="Simplified starting system schematic">
+        <g class="ed-part" data-part="battery"><rect x="5" y="60" width="90" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="50" y="82" fill="#eee" text-anchor="middle" font-size="12">Battery</text><text x="50" y="99" fill="#bbb" text-anchor="middle" font-size="11">12V 18Ah</text></g>
+        <rect x="105" y="60" width="95" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="152" y="82" fill="#eee" text-anchor="middle" font-size="12">30A Circuit</text><text x="152" y="99" fill="#eee" text-anchor="middle" font-size="12">Breaker</text>
+        <rect x="210" y="60" width="95" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="257" y="82" fill="#eee" text-anchor="middle" font-size="12">Ignition</text><text x="257" y="99" fill="#eee" text-anchor="middle" font-size="12">Switch</text>
+        <rect x="315" y="60" width="100" height="50" rx="8" fill="#1a1a20" stroke="#9d6bff" stroke-width="2"/><text x="365" y="82" fill="#eee" text-anchor="middle" font-size="12">Start Relay</text><text x="365" y="99" fill="#bbb" text-anchor="middle" font-size="11">30 · 87 · 85 · 86</text>
+        <line x1="95" y1="85" x2="105" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="200" y1="85" x2="210" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="305" y1="85" x2="315" y2="85" stroke="#9d6bff" stroke-width="2"/>
+        <rect x="5" y="150" width="80" height="62" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="45" y="176" fill="#eee" text-anchor="middle" font-size="12">Clutch</text><text x="45" y="193" fill="#eee" text-anchor="middle" font-size="12">ring gear</text>
+        <rect x="100" y="150" width="75" height="62" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="137" y="176" fill="#eee" text-anchor="middle" font-size="12">Jackshaft</text><text x="137" y="193" fill="#eee" text-anchor="middle" font-size="12">/ pinion</text>
+        <g class="ed-part" data-part="starter"><rect x="190" y="150" width="85" height="62" rx="8" fill="#1a1a20" stroke="#9d6bff" stroke-width="2"/><text x="232" y="176" fill="#eee" text-anchor="middle" font-size="12">Starter</text><text x="232" y="193" fill="#eee" text-anchor="middle" font-size="12">Motor</text><text x="232" y="207" fill="#bbb" text-anchor="middle" font-size="10">160–180 A</text></g>
+        <rect x="290" y="150" width="125" height="62" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="352" y="172" fill="#eee" text-anchor="middle" font-size="12">Starter Solenoid</text><text x="352" y="188" fill="#bbb" text-anchor="middle" font-size="10">part of starter assembly</text><text x="352" y="203" fill="#bbb" text-anchor="middle" font-size="10">Battery · Motor · Relay</text>
+        <line x1="85" y1="181" x2="100" y2="181" stroke="#9d6bff" stroke-width="2"/><line x1="175" y1="181" x2="190" y2="181" stroke="#9d6bff" stroke-width="2"/><line x1="275" y1="181" x2="290" y2="181" stroke="#9d6bff" stroke-width="2"/>
+        <line x1="365" y1="110" x2="365" y2="150" stroke="#9d6bff" stroke-width="2"/>
+        <text x="355" y="132" fill="#bbb" text-anchor="end" font-size="11">relay output → solenoid</text>
+        <rect x="10" y="245" width="140" height="56" rx="8" fill="#1a1a20" stroke="#9d6bff" stroke-width="2"/><text x="80" y="267" fill="#eee" text-anchor="middle" font-size="12">Right-Hand Control</text><text x="80" y="284" fill="#bbb" text-anchor="middle" font-size="11">Start Switch + Stop/Run</text>
+        <polyline points="80,245 80,228 97,228 97,40 365,40 365,60" fill="none" stroke="#9d6bff" stroke-width="2"/>
+        <text x="232" y="34" fill="#bbb" text-anchor="middle" font-size="11">control side → relay coil</text>
+        <text x="285" y="275" fill="#bbb" text-anchor="middle" font-size="11">relay coil → ground (GRD2)</text>
+        <text x="210" y="318" fill="#bbb" text-anchor="middle" font-size="11">Typical draw 160–180 A cranking · over 200 A = fault (FSM §5 p. 5-10)</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Brakes — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from FSM #99482-98 §2 and the 1984–1999 Softail Repair Manual. A simplified schematic, not a factory diagram.</p>
+      <svg viewBox="0 0 420 200" width="100%" role="img" aria-label="Simplified brake schematic">
+        <g class="ed-part" data-part="master-cyl"><rect x="10" y="75" width="90" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="55" y="95" fill="#eee" text-anchor="middle" font-size="12">Master cyl.</text><text x="55" y="113" fill="#bbb" text-anchor="middle" font-size="11">DOT 5 ONLY</text></g>
+        <g class="ed-part" data-part="brake-line"><rect x="140" y="75" width="80" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="180" y="95" fill="#eee" text-anchor="middle" font-size="12">Line</text><text x="180" y="113" fill="#bbb" text-anchor="middle" font-size="11">banjo 17–22 ft-lbs</text></g>
+        <g class="ed-part" data-part="caliper"><rect x="260" y="75" width="70" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="295" y="95" fill="#eee" text-anchor="middle" font-size="12">Caliper</text><text x="295" y="113" fill="#bbb" text-anchor="middle" font-size="11">bleeder 80–100 in-lbs</text></g>
+        <g class="ed-part" data-part="disc"><rect x="350" y="75" width="60" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="380" y="95" fill="#eee" text-anchor="middle" font-size="12">Disc</text><text x="380" y="113" fill="#bbb" text-anchor="middle" font-size="11">+ pads</text></g>
+        <line x1="100" y1="100" x2="140" y2="100" stroke="#9d6bff" stroke-width="2"/><line x1="220" y1="100" x2="260" y2="100" stroke="#9d6bff" stroke-width="2"/><line x1="330" y1="100" x2="350" y2="100" stroke="#9d6bff" stroke-width="2"/>
+        <g class="ed-part" data-part="dot5-fluid"><rect x="10" y="140" width="90" height="24" rx="6" fill="#1a1a20" stroke="#9d6bff" stroke-width="1.5"/><text x="55" y="156" fill="#eee" text-anchor="middle" font-size="11">DOT 5 fluid</text></g>
+        <text x="210" y="30" fill="#bbb" text-anchor="middle" font-size="11">Pads at 1/16 in are done · 44063-83C/D fits all XL/FX/FL 1984–99 (bulletin P-20)</text>
+        <text x="210" y="160" fill="#9d6bff" text-anchor="middle" font-size="12">DOT 5 silicone only</text>
+        <text x="210" y="180" fill="#bbb" text-anchor="middle" font-size="11">Disc screws: front 16–24 ft-lbs · rear 30–45 ft-lbs</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Primary / drive — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from the 1984–1999 Softail Repair Manual. A simplified schematic, not a factory diagram.</p>
+      <svg viewBox="0 0 420 190" width="100%" role="img" aria-label="Simplified primary and drive schematic">
+        <rect x="10" y="60" width="60" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="40" y="90" fill="#eee" text-anchor="middle" font-size="12">Engine</text>
+        <g class="ed-part" data-part="primary-chain"><rect x="95" y="60" width="70" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="130" y="82" fill="#eee" text-anchor="middle" font-size="12">Primary</text><text x="130" y="98" fill="#eee" text-anchor="middle" font-size="12">chain</text></g>
+        <g class="ed-part" data-part="primary-shoe"><line x1="130" y1="110" x2="130" y2="132" stroke="#9d6bff" stroke-width="1.5"/><text x="130" y="148" fill="#9d6bff" font-size="12" text-anchor="middle">Tensioner shoe</text></g>
+        <g class="ed-part" data-part="clutch"><rect x="190" y="60" width="60" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="220" y="90" fill="#eee" text-anchor="middle" font-size="12">Clutch</text></g>
+        <g class="ed-part" data-part="transmission"><rect x="275" y="60" width="60" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="305" y="82" fill="#eee" text-anchor="middle" font-size="11">Trans-</text><text x="305" y="98" fill="#eee" text-anchor="middle" font-size="11">mission</text></g>
+        <g class="ed-part" data-part="belt"><rect x="360" y="60" width="50" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="385" y="82" fill="#eee" text-anchor="middle" font-size="12">Belt</text><text x="385" y="98" fill="#eee" text-anchor="middle" font-size="12">→ wheel</text></g>
+        <line x1="70" y1="85" x2="95" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="165" y1="85" x2="190" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="250" y1="85" x2="275" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="335" y1="85" x2="360" y2="85" stroke="#9d6bff" stroke-width="2"/>
+        <text x="210" y="30" fill="#bbb" text-anchor="middle" font-size="11">Belt deflection 3/8–1/2 in · Primary oil: 1997: 32 oz · 1998: 26 oz</text>
+        <text x="210" y="172" fill="#9d6bff" text-anchor="middle" font-size="12">Chain noise follows engine speed · belt noise follows road speed</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Engine top end — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from the 1984–1999 Softail Repair Manual. A simplified schematic, not a factory diagram.</p>
+      <svg viewBox="0 0 420 220" width="100%" role="img" aria-label="Simplified engine top end schematic">
+        <polygon points="150,60 190,60 180,150 160,150" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/>
+        <polygon points="230,60 270,60 260,150 240,150" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/>
+        <g class="ed-part" data-part="heads"><rect x="140" y="30" width="60" height="30" rx="6" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="170" y="49" fill="#eee" text-anchor="middle" font-size="11">Front head</text></g>
+        <g class="ed-part" data-part="heads"><rect x="220" y="30" width="60" height="30" rx="6" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="250" y="49" fill="#eee" text-anchor="middle" font-size="11">Rear head</text></g>
+        <g class="ed-part" data-part="crankcase"><rect x="150" y="150" width="120" height="40" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="210" y="168" fill="#eee" text-anchor="middle" font-size="12">Crankcase</text><text x="210" y="184" fill="#bbb" text-anchor="middle" font-size="11">1340cc Evo</text></g>
+        <g class="ed-part" data-part="valves"><line x1="170" y1="60" x2="120" y2="40" stroke="#9d6bff" stroke-width="1.5"/><text x="116" y="36" fill="#9d6bff" font-size="12" text-anchor="end">Valves + pushrods</text></g>
+        <g class="ed-part" data-part="lifters"><line x1="250" y1="60" x2="300" y2="40" stroke="#9d6bff" stroke-width="1.5"/><text x="304" y="36" fill="#9d6bff" font-size="12">Lifters</text></g>
+        <text x="210" y="210" fill="#bbb" text-anchor="middle" font-size="11">Lifter tick = half engine speed · Rod knock = once/rev, worse under load → oil pressure first</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Suspension / wheels — simplified schematic</h3>
+      <p class="ed-note">Traced by hand from FSM #99482-98 §2. A simplified schematic, not a factory diagram.</p>
+      <svg viewBox="0 0 420 200" width="100%" role="img" aria-label="Simplified suspension and wheels schematic">
+        <g class="ed-part" data-part="fork"><rect x="10" y="60" width="90" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="55" y="80" fill="#eee" text-anchor="middle" font-size="12">Front fork</text><text x="55" y="98" fill="#bbb" text-anchor="middle" font-size="11">oil 11.5 oz ea.</text></g>
+        <g class="ed-part" data-part="front-axle"><rect x="130" y="60" width="90" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="175" y="80" fill="#eee" text-anchor="middle" font-size="12">Front axle</text><text x="175" y="98" fill="#bbb" text-anchor="middle" font-size="11">45–50 ft-lbs</text></g>
+        <g class="ed-part" data-part="rear-axle"><rect x="250" y="60" width="70" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="285" y="80" fill="#eee" text-anchor="middle" font-size="12">Rear axle</text><text x="285" y="98" fill="#bbb" text-anchor="middle" font-size="11">60–65 ft-lbs</text></g>
+        <g class="ed-part" data-part="shocks"><rect x="350" y="60" width="60" height="50" rx="8" fill="#1a1a20" stroke="#c0c0c0" stroke-width="2"/><text x="380" y="80" fill="#eee" text-anchor="middle" font-size="12">Shocks</text><text x="380" y="98" fill="#bbb" text-anchor="middle" font-size="11">115–130 ft-lbs</text></g>
+        <line x1="100" y1="85" x2="130" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="220" y1="85" x2="250" y2="85" stroke="#9d6bff" stroke-width="2"/><line x1="320" y1="85" x2="350" y2="85" stroke="#9d6bff" stroke-width="2"/>
+        <g class="ed-part" data-part="wheel-bearing"><text x="210" y="30" fill="#bbb" text-anchor="middle" font-size="11">Slider cap nuts 9–13 ft-lbs · Wheel bearings 9052, two per wheel, every 10,000 mi</text></g>
+        <text x="210" y="145" fill="#9d6bff" text-anchor="middle" font-size="12">FLSTC/FLSTF/FLSTS: 36/36 solo · 36/40 two-up (Dunlop, cold)</text>
+        <text x="210" y="165" fill="#bbb" text-anchor="middle" font-size="11">FXSTC/FXSTS/FXSTSB: 30/36 solo · 30/40 two-up · Inspect tires after 5 yrs, replace at 10</text>
+      </svg>
+    </div>
+    <div class="ed-card">
+      <h3>Your bikes&rsquo; carb baselines</h3>
+      <div id="carb-list"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Parts — where to buy (links only, no in-app payments)</h3>
+      <div id="supplier-list"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Local spots — Glendale, AZ</h3>
+      <p class="ed-note">Joshua&rsquo;s home turf, checked Nov 24, 2026. Call ahead — hours and services change. This list is Glendale and the near West Valley only.</p>
+      <div id="local-list"></div>
+    </div>
+  </section>
+
+  <section class="ed-panel" id="panel-listen">
+    <div class="ed-card">
+      <h3>Idle RPM meter</h3>
+      <p class="ed-note">Hold the phone near the exhaust at idle. The meter reads the exhaust pulse frequency and converts it to RPM. Factory idle: 1000&ndash;1050 rpm. Deterministic signal processing — no AI, no guessing.</p>
+      <p class="ed-big"><span id="rpm">—</span> <span style="font-size:.5em">rpm</span></p>
+      <div class="ed-meter"><div id="rpm-bar" style="width:0%"></div></div>
+      <p id="rpm-verdict" class="ed-note"></p>
+      <button class="ed-btn" id="rpm-start">Start listening</button>
+      <button class="ed-btn ghost" id="rpm-stop">Stop</button>
+    </div>
+    <div class="ed-card">
+      <h3>Quick-listen</h3>
+      <p class="ed-note">One tap, 10 seconds: instant RPM + stability + the top 3 likely sounds, each with its confirming test. Sounds are hints, never a verdict.</p>
+      <button class="ed-btn" id="quick-start">Quick-listen (10 s)</button>
+      <p id="quick-status" class="ed-note"></p>
+      <div id="quick-results"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Record a clip</h3>
+      <p class="ed-note">Ten-second video: idle, throttle blip, or a noise up close. Clips live in this visit only — download the ones you want to keep, then attach the file when you share a diagnosis.</p>
+      <label for="clip-type">Clip type</label>
+      <select id="clip-type">
+        <option value="idle">Idle — 10 s at the exhaust</option>
+        <option value="blip">Throttle blip — 10 s</option>
+        <option value="noise">Noise up close — 10 s</option>
+      </select>
+      <button class="ed-btn" id="clip-record">Record 10 s</button>
+      <p id="clip-status" class="ed-note"></p>
+      <video id="clip-preview" class="ed-clip" controls style="display:none"></video>
+      <p id="clip-download"></p>
+    </div>
+    <div class="ed-card">
+      <h3>Listen and compare — YouTube</h3>
+      <p class="ed-note">Links only — the app never downloads YouTube audio. Every label is the uploader&rsquo;s claim or the thread&rsquo;s guess, and the note under each link says so. Phone recordings amplify mechanical sounds and dampen the exhaust note, so a bike can sound worse on video than in reality. No usable video exists for piston slap, primary chain, detonation/ping, starter grind, or belt noise — those need your own recordings.</p>
+      <div id="compare-list"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Healthy baselines</h3>
+      <p class="ed-note">Record each bike while it is running right. Future recordings are compared against ITS OWN sound, not a generic library.</p>
+      <button class="ed-btn" id="baseline-save">Save this idle as the baseline</button>
+      <div id="baseline-list"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Sound hints</h3>
+      <div id="sound-list"></div>
+    </div>
+  </section>
+
+  <section class="ed-panel" id="panel-vin">
+    <div class="ed-card">
+      <h3>VIN decoder</h3>
+      <p class="ed-note">Decodes year, model family, engine and plant from published VIN structure, with check-digit validation. A Harley VIN does <b>not</b> encode color or options, and no public Harley build-record lookup exists. Model codes below are FSM-verified for 1997&ndash;98 Softails; later year codes follow the standard 30-year cycle.</p>
+      <label for="vin-input">17-digit VIN</label>
+      <input type="text" id="vin-input" placeholder="1HD1BJL41VY010000" maxlength="17" class="ed-mono">
+      <button class="ed-btn" id="vin-decode">Decode</button>
+      <div id="vin-result"></div>
+    </div>
+  </section>
+
+  <section class="ed-panel" id="panel-recalls">
+    <div class="ed-card">
+      <h3>Recalls &amp; service bulletins</h3>
+      <p class="ed-note">Offline bundle from NHTSA (U.S. federal public domain). 12 recall campaigns 1986&ndash;1999, 83 Harley bulletins 1995&ndash;1999, 61 owner complaints counted by component. No open API can say whether a specific VIN already had a recall fixed — check <a href="https://www.nhtsa.gov/recalls">nhtsa.gov/recalls</a> or a dealer for that.</p>
+      <label for="recall-model">Model family</label>
+      <select id="recall-model">
+        <option>FL</option><option>SOFTAIL</option><option>FX</option><option>FXR</option><option>DYNA</option><option>SPORTSTER</option><option>XL</option>
+      </select>
+      <label for="recall-year">Model year</label>
+      <input type="text" id="recall-year" value="1995" maxlength="4" inputmode="numeric">
+      <button class="ed-btn" id="recall-lookup">Look up</button>
+      <div id="recall-results"></div>
+    </div>
+  </section>
+
+  <section class="ed-panel" id="panel-torque">
+    <div class="ed-card">
+      <h3>Torque &amp; specs</h3>
+      <p class="ed-note">Factory values from the Softail 1997&ndash;1998 service manual. Covers FXSTC, FXSTS, FXSTSB, FLSTC, FLSTF, FLSTS. Nothing here is guessed — a value that isn&rsquo;t in the manual doesn&rsquo;t appear. Cylinder head and crankcase bolts use a torque sequence in FSM §3, not a single value — the full sequences, with the bolt-numbering diagrams, are below the tables. The generic bolt-size table (FSM §1, p. 1-10) isn&rsquo;t included; the specific tables below govern.</p>
+      <label for="torque-search">Find a fastener</label>
+      <input type="text" id="torque-search" placeholder="e.g. axle, brake, shock" autocomplete="off">
+      <div id="torque-table"></div>
+      <div id="torque-chapters"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Torque sequences</h3>
+      <p class="ed-note">Step-by-step, from FSM §3. The diagrams are simplified schematics traced from the factory figures — the numbering is the point, not the drawing.</p>
+      <div id="torque-sequences"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Capacities</h3>
+      <div id="torque-capacities"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Tire pressures — Dunlop only, cold</h3>
+      <div id="torque-pressures"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Dimensions &amp; weights</h3>
+      <div id="torque-dims"></div>
+    </div>
+  </section>
+
+  <section class="ed-panel" id="panel-data">
+    <div class="ed-card">
+      <h3>Your data</h3>
+      <p class="ed-note">Sessions, baselines and your bikes live on this device only. Export backs them up as one JSON file; import restores it. Nothing leaves the phone unless you share it.</p>
+      <button class="ed-btn" id="export">Export all data</button>
+      <button class="ed-btn ghost" id="import-btn">Import data</button>
+      <input type="file" id="import" accept="application/json" style="display:none">
+    </div>
+    <div class="ed-card">
+      <h3>Past diagnoses</h3>
+      <p class="ed-note">Every session you save lands here. Tap one to reopen its answers and ranked causes.</p>
+      <div id="history-list"></div>
+      <div id="history-detail"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Sources &amp; credits</h3>
+      <p class="ed-note">Specs and procedures: FSM #99482-98 (1997&ndash;98 Softail Service Manual), 1984&ndash;1999 Softail Repair Manual, S&amp;S instruction 51-1012, Easyriders ER_153 / ER_166, factory bulletin P-20 (Nov 18, 1991). Recalls, bulletins and complaint counts: NHTSA (U.S. federal public domain). Photos: Wikimedia Commons, credited on each photo. Diagrams are hand-traced simplifications, never factory art. Torque and spec values are published facts, each labeled with its source; unverified items stay flagged.</p>
+    </div>
+  </section>
+</div>
+<script src="data.js"></script>
+<script src="vin.js"></script>
+<script src="scoring.js"></script>
+<script src="audio.js"></script>
+<script src="tire.js"></script>
+<script src="nhtsa.js"></script>
+<script src="handoff.js"></script>
+<script src="sw-update.js"></script>
+<script src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
