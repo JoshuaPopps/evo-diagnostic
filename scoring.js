@@ -16,7 +16,28 @@ const ED_Scoring = (() => {
     float: "float", enrichener: "enrichener", needle: "needle jet",
     "air-cleaner": "air cleaner", "main-rich": "main jet",
     "clutch-drag": "clutch drag", linkage: "linkage", pawl: "pawl",
-    internal: "internal"
+    internal: "internal",
+    /* Library sweep (Nov 24-25, 2026): magazine + Sportster/Clymer causes.
+       Each keyword must occur in exactly one cause name within its tree. */
+    turncount: "turn-count", advance: "advance mechanism",
+    pumpjet: "pump jet", vent: "vent",
+    jackshaft: "jackshaft", vacuum: "vacuum petcock",
+    grounded: "grounded", masquerade: "masquerading",
+    spare: "spare spark", trigger: "trigger plate",
+    hose: "hose", aerate: "aerating",
+    anchor: "anchor-plate", solenoid: "solenoid seal",
+    screen: "screen", hiss: "hiss",
+    steering: "steering-head", forkoil: "fork oil",
+    wetsump: "wet-sumping", vanish: "vanishing",
+    dished: "dished", gummed: "gummed",
+    flicker: "flicker",
+    lever: "lever set too low", offcenter: "off-center",
+    /* Tech Tips Vol. 3 (Nov 25, 2026). Same rule: each word must occur in
+       exactly one cause name within its tree. */
+    reversion: "reversion", stuck: "stuck",
+    breather: "breather timing", drain: "drain passage", spotface: "spotface",
+    knockback: "knock-back", spoke: "spoke", track: "track",
+    crimped: "crimped", basenuts: "base nuts"
   };
   function applyAnswer(weights, causes, yesValue, answeredYes) {
     if (!answeredYes || !yesValue || yesValue === "next") return weights;

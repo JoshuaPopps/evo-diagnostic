@@ -1,5 +1,5 @@
 /* The Evo Diagnostic — service worker. Cache-first, offline-first. */
-const CACHE = "evo-diagnostic-v9";
+const CACHE = "evo-diagnostic-v10";
 const ASSETS = [
   ".", "index.html", "styles.css", "manifest.json", "data.js", "vin.js", "scoring.js", "app.js", "sw-update.js", "audio.js", "tire.js", "nhtsa.js", "handoff.js",
   "icon-192.png", "icon-512.png", "data/nhtsa-evo-bundle.json",
