@@ -5,6 +5,12 @@
   "use strict";
   const D = ED_DATA;
   const $ = (id) => document.getElementById(id);
+  /* Shared parts + torque core (pg-parts-core.js): every price and every
+     FSM torque value comes from here — data.js holds only the keys (atlas
+     part keys, torque table ids + slugs). Guarded like PG_SWUpdate: if
+     the module failed to load, price lines stay empty and the Torque tab
+     says so, never a guessed value. */
+  const PartsCore = (typeof PG_PartsCore !== "undefined") ? PG_PartsCore : null;
   const store = {
     load() { try { return JSON.parse(localStorage.getItem("evo-diagnostic") || "{}"); } catch (e) { return {}; } },
     save(s) { localStorage.setItem("evo-diagnostic", JSON.stringify(s)); }
@@ -14,6 +20,7 @@
   state.baselines = state.baselines || {};
   state.bikes = state.bikes || [];
   state.bike = state.bike || "b1";
+  state.in_progress = state.in_progress || null;
   const allBikes = () => D.roster.concat(state.bikes);
 
   /* Service-worker update button (sw-update.js): hidden until a new
@@ -75,6 +82,7 @@
     store.save(state);
     renderBikeSel();
     renderBaselines();
+    renderHistory();
     $("add-bike-status").textContent = name + " added. Specs stay labeled Evo 1340 — add your own bike's numbers in the Atlas carb list when you know them.";
     $("add-bike-name").value = "";
     addModelSel.value = "";
@@ -90,10 +98,33 @@
     treeList.appendChild(b);
   });
 
-  let current = null; // {tree, step, weights, answers}
-  function startTree(t) {
-    current = { tree: t, step: 0, weights: {}, answers: [] };
+  /* ---------- wizard front step (batch 2): three questions narrow the
+     tree choice. The wizard only suggests — every tree stays directly
+     accessible below, and the current flow is unchanged. When it happens
+     and how urgent it is are shown back and saved with the diagnosis;
+     they do not filter trees (no library data supports that). */
+  $("wiz-go").addEventListener("click", () => {
+    const wizard = { area: $("wiz-area").value, when: $("wiz-when").value, urgency: $("wiz-urgency").value };
+    const suggested = ED_Wizard.suggest(wizard.area, wizard.urgency, D.trees);
+    const desc = ED_Wizard.describe(wizard.area, wizard.when, wizard.urgency);
+    const note = wizard.urgency === "roadside"
+      ? "<p class='ed-note'>Roadside: if it is not safe to ride, do not ride — run the tree parked. Trees with a critical-urgency cause are listed first.</p>"
+      : "";
+    $("wiz-results").innerHTML = "<p><b>Suggested for " + desc + ":</b></p>" + note +
+      suggested.map((t) => "<button class='ed-tree-btn' data-wiz='" + t.id + "'><b>" + t.title + "</b><br><span class='ed-note'>" + t.system + "</span></button>").join("") +
+      "<p class='ed-note'>Every tree is still below — the wizard only suggests.</p>";
+    $("wiz-results").querySelectorAll("[data-wiz]").forEach((btn) => btn.addEventListener("click", () => {
+      const t = D.trees.find((x) => x.id === btn.dataset.wiz);
+      if (t) startTree(t, wizard);
+    }));
+    $("wiz-results").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
+  let current = null; // {tree, step, weights, answers, wizard}
+  function startTree(t, wizard) {
+    current = { tree: t, step: 0, weights: {}, answers: [], wizard: wizard || null };
     t.causes.forEach((c) => { current.weights[c.cause] = c.weight; });
+    saveProgress();
     $("session").style.display = "block";
     $("results").style.display = "none";
     $("session-title").textContent = t.title + " — " + t.system;
@@ -102,6 +133,62 @@
     renderStep();
     $("session").scrollIntoView();
   }
+  /* ---------- resumable trees (batch 2): progress is saved to localStorage
+     on every answer (and on start). Reopening the app offers Resume on an
+     in-progress tree; finishing or abandoning it clears the saved progress.
+     Starting a different tree abandons the old one — the new tree replaces
+     the saved progress. */
+  function saveProgress() {
+    if (!current) { state.in_progress = null; }
+    else {
+      state.in_progress = {
+        tree: current.tree.id, step: current.step, weights: current.weights,
+        answers: current.answers, bike: state.bike, wizard: current.wizard || null,
+        started: (state.in_progress && state.in_progress.tree === current.tree.id && state.in_progress.started)
+          ? state.in_progress.started : new Date().toISOString()
+      };
+    }
+    store.save(state);
+  }
+  function clearProgress() { state.in_progress = null; store.save(state); renderResume(); }
+  function renderResume() {
+    const banner = $("resume-banner");
+    const p = state.in_progress;
+    if (!p) { banner.style.display = "none"; return; }
+    const t = D.trees.find((x) => x.id === p.tree);
+    if (!t) { state.in_progress = null; store.save(state); banner.style.display = "none"; return; }
+    $("resume-text").textContent = t.title + " — step " + (Math.min(p.step, t.steps.length - 1) + 1) + " of " + t.steps.length +
+      (p.wizard ? " (" + ED_Wizard.describe(p.wizard.area, p.wizard.when, p.wizard.urgency) + ")" : "") +
+      ", started " + new Date(p.started || Date.now()).toLocaleString() + ".";
+    banner.style.display = "block";
+  }
+  $("resume-btn").addEventListener("click", () => {
+    const p = state.in_progress;
+    if (!p) return;
+    const t = D.trees.find((x) => x.id === p.tree);
+    if (!t) return;
+    current = { tree: t, step: Math.min(p.step, t.steps.length), weights: p.weights || {}, answers: p.answers || [], wizard: p.wizard || null };
+    t.causes.forEach((c) => { if (!(c.cause in current.weights)) current.weights[c.cause] = c.weight; });
+    state.bike = p.bike || state.bike;
+    store.save(state);
+    renderBikeSel();
+    $("session").style.display = "block";
+    $("results").style.display = "none";
+    $("session-title").textContent = t.title + " — " + t.system;
+    $("session-testcase").textContent = t.test_case || "";
+    $("photo-preview").innerHTML = "";
+    $("resume-banner").style.display = "none";
+    renderStep();
+    $("session").scrollIntoView();
+  });
+  $("resume-discard").addEventListener("click", () => { clearProgress(); });
+  $("abandon-tree").addEventListener("click", () => {
+    current = null;
+    clearProgress();
+    $("session").style.display = "none";
+    $("results").style.display = "none";
+  });
+  renderResume();
   function renderStep() {
     const t = current.tree, el = $("tree-step");
     if (current.step >= t.steps.length) return finishTree();
@@ -120,12 +207,24 @@
     current.answers.push({ q: s.q, a: yes ? "yes" : "no" });
     current.weights = ED_Scoring.applyAnswer(current.weights, t.causes, s.yes, yes);
     current.step++;
+    saveProgress();
     renderStep();
   }
-  /* ---------- parts & prices (checked Nov 24, 2026; link out to verify) ---------- */
+  /* ---------- parts & prices (checked Nov 24, 2026; link out to verify) ----------
+     Prices come from the shared parts core, never from data.js. A `see`
+     pointer is shown as-is (its note + the kit it ships in), never
+     silently followed. No core, no price line — never a guessed value. */
+  function formatCheckDate(iso) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const parts = String(iso || "").split("-");
+    if (parts.length !== 3) return String(iso || "");
+    const m = parseInt(parts[1], 10);
+    return months[m - 1] + " " + parseInt(parts[2], 10) + ", " + parts[0];
+  }
   function priceHtml(keys) {
+    if (!PartsCore) return "";
     const entries = (Array.isArray(keys) ? keys : [keys]).flatMap((k) => {
-      const e = D.prices[k];
+      const e = PartsCore.getPrice(k);
       return e ? [e] : [];
     });
     if (!entries.length) return "";
@@ -133,14 +232,14 @@
     const priced = [];
     entries.forEach((r) => {
       if (r.see) {
-        const rec = D.prices[r.see];
+        const rec = PartsCore.getPrice(r.see);
         if (rec) {
-          lines.push(r.note + " <a href='" + rec.url + "' target='_blank' rel='noopener'>" + rec.name + " — $" + rec.price.toFixed(2) + "</a> (" + rec.source + ", checked Nov 24, 2026)");
+          lines.push(r.note + " <a href='" + rec.url + "' target='_blank' rel='noopener'>" + rec.name + " — $" + rec.price.toFixed(2) + "</a> (" + rec.source + ", checked " + formatCheckDate(rec.date) + ")");
           priced.push(rec);
         }
         return;
       }
-      lines.push("<a href='" + r.url + "' target='_blank' rel='noopener'>" + r.name + " — $" + r.price.toFixed(2) + "</a> (" + r.source + ", checked Nov 24, 2026)" +
+      lines.push("<a href='" + r.url + "' target='_blank' rel='noopener'>" + r.name + " — $" + r.price.toFixed(2) + "</a> (" + r.source + ", checked " + formatCheckDate(r.date) + ")" +
         (r.note ? "<br><span class='ed-note'>" + r.note + "</span>" : ""));
       priced.push(r);
     });
@@ -153,6 +252,7 @@
   }
   function finishTree() {
     $("tree-step").innerHTML = ""; // no stale Yes/No buttons left to click
+    clearProgress(); // a finished tree has no progress left to resume
     const t = current.tree;
     const ranked = t.causes.map((c) => ({ ...c, score: current.weights[c.cause] || 0 }))
       .sort((a, b) => b.score - a.score);
@@ -164,20 +264,23 @@
         : { cls: "ok", text: "Likely rideable — " + top.cause + ". " + top.ride };
     const total = ranked.reduce((s, c) => s + c.score, 0) || 1;
     let html = "<h3>Ranked likely causes</h3>" +
-      "<p class='ed-note'>Ranked by the checks you just ran. Every cause names its confirming test — run it before buying parts. Confidence is a share of the weight from your answers, not a measurement.</p>" +
+      "<p class='ed-note'>Ranked by the checks you just ran. Every cause names its confirming test — run it before buying parts. Confidence is a share of the weight from your answers, not a measurement. NHTSA counts, where shown, are owner complaints filed for the cause's whole component family — not for that exact fault.</p>" +
       "<div class='ed-verdict " + verdict.cls + "'>Safe to ride? " + verdict.text + "</div>";
     ranked.forEach((c) => {
       const pct = Math.round((c.score / total) * 100);
+      const nhtsa = bundle ? ED_NHTSA.complaintForCause(bundle.complaint_counts_by_component, t.system, c.cause) : null;
       html += "<div class='ed-cause " + c.urgency + "'><b>" + c.cause + "</b> — " + pct + "%" +
         "<br>Confirming test: " + c.test +
         "<br>Fix: " + c.fix +
         (c.source ? "<br><span class='ed-note'>Source: " + c.source + "</span>" : "") +
+        (nhtsa ? "<br><span class='ed-note'>NHTSA: " + ED_NHTSA.complaintLabel(nhtsa) + " — of " + bundle.complaint_total + " owner complaints in the bundle.</span>" : "") +
         (c.part ? priceHtml(c.part) : "") +
         "<br>Urgency: " + c.urgency + "</div>";
     });
     html += "<p class='ed-note'>DIY vs shop: the checks above are driveway work with basic tools. " +
       "A bottom-end knock or a brake leak is shop work. Prices were read from live product pages Nov 24, 2026, with a link out per part — verify before you buy, prices move.</p>" +
       "<button class='ed-btn' id='share-diag'>Share this diagnosis</button> " +
+      "<button class='ed-btn ghost' id='copy-diag'>Copy report</button> " +
       "<button class='ed-btn ghost' id='save-diag'>Save session</button> " +
       "<button class='ed-btn' id='send-carb'>Send to Carb Journal</button> " +
       "<button class='ed-btn' id='send-log'>Send to Bike Log</button>";
@@ -185,24 +288,39 @@
     res.innerHTML = html;
     res.style.display = "block";
     $("share-diag").addEventListener("click", () => shareDiagnosis(t, ranked, verdict.text));
+    $("copy-diag").addEventListener("click", () => copyDiagnosis(t, ranked, verdict.text));
     $("send-carb").addEventListener("click", () => sendDiagnosis(t, ranked, verdict.text, "diagnosis-to-carb"));
     $("send-log").addEventListener("click", () => sendDiagnosis(t, ranked, verdict.text, "diagnosis-to-task"));
     $("save-diag").addEventListener("click", () => {
-      state.sessions.push({ when: new Date().toISOString(), bike: state.bike, tree: t.id, answers: current.answers, ranked: ranked.map((c) => c.cause) });
+      state.sessions.push({ when: new Date().toISOString(), bike: state.bike, tree: t.id, answers: current.answers, ranked: ranked.map((c) => c.cause), verdict: verdict.text, result: top.cause, wizard: current.wizard || null });
       store.save(state);
       renderHistory();
       $("save-diag").textContent = "Saved";
     });
     res.scrollIntoView();
   }
-  function shareDiagnosis(t, ranked, verdict) {
+  /* ---------- shareable report (batch 2): plain text, built by ED_Report —
+     bike, date, symptom, severity, safe-to-ride verdict, ranked causes
+     with their sources, next step. Web Share where available, clipboard
+     fallback. No PDF, no network. */
+  function buildReportText(t, ranked, verdict) {
     const bike = allBikes().find((b) => b.id === state.bike);
-    const text = "The Evo Diagnostic — " + t.title + " (" + (bike ? bike.name : "") + ")\n" +
-      "Safe to ride? " + verdict + "\n" +
-      ranked.map((c, i) => (i + 1) + ". " + c.cause + " — test: " + c.test).join("\n") +
-      "\nDiagnosis only — run the confirming test before buying parts.";
+    return ED_Report.build({
+      bike: bike ? bike.name : state.bike,
+      date: new Date().toLocaleString(),
+      tree: t, ranked, verdict
+    });
+  }
+  function shareDiagnosis(t, ranked, verdict) {
+    const text = buildReportText(t, ranked, verdict);
     if (navigator.share) navigator.share({ title: "Evo Diagnostic", text }).catch(() => {});
     else if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => alert("Diagnosis copied — paste it to your mechanic or forum."));
+    else alert("Sharing is not available in this browser — the report is on screen; copy it by hand.");
+  }
+  function copyDiagnosis(t, ranked, verdict) {
+    const text = buildReportText(t, ranked, verdict);
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => alert("Report copied — paste it to your mechanic or forum."));
+    else alert("Clipboard is not available in this browser — the report is on screen; copy it by hand.");
   }
   /* ---------- handoff send (HANDOFF-FORMAT.md v1) ---------- */
   function sendDiagnosis(t, ranked, verdict, kind) {
@@ -222,7 +340,7 @@
         "<p>" + p.fn + "</p>" +
         "<p><b>Spec:</b> " + p.spec + "</p>" +
         "<p><b>How it usually fails:</b> " + p.failures + "</p>" +
-        (D.prices[el.dataset.part] ? "<p>" + priceHtml(el.dataset.part).replace(/^<br>/, "") + "</p>" : "") +
+        (PartsCore && PartsCore.getPrice(el.dataset.part) ? "<p>" + priceHtml(el.dataset.part).replace(/^<br>/, "") + "</p>" : "") +
         "<p class='ed-note'>Source: " + p.source + "</p>";
       box.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
@@ -292,8 +410,19 @@
     (s.url ? " · <a href='" + s.url + "'>Website</a>" : "") +
     "<br><span class='ed-note'>" + s.note + "</span></div>").join("");
 
+  /* ---------- "Before you start" safety block (batch 2): one consistent
+     block at the top of every guided hands-on card. Generic shop safety
+     (D.safety_block) — the battery items are FSM §8 warnings. */
+  function safetyHtml() {
+    const b = D.safety_block;
+    return "<div class='ed-safety'><b>" + b.title + "</b><ul>" +
+      b.items.map((i) => "<li>" + i + "</li>").join("") + "</ul>" +
+      "<p class='ed-note'>" + b.note + "</p></div>";
+  }
+
   /* ---------- battery & charging guided tests (FSM #99482-98 section 8) ---------- */
   $("charging-tests").innerHTML =
+    safetyHtml() +
     "<p class='ed-note'>" + D.charging_tests.intro + " <i>Source: " + D.charging_tests.ref + "</i></p>" +
     D.charging_tests.steps.map((s, i) =>
       "<div class='ed-cause'><b>" + (i + 1) + ". " + s.title + "</b>" +
@@ -304,6 +433,7 @@
 
   /* ---------- compression test guided card (FSM #99482-98 §3, pp. 3-11–3-12) ---------- */
   $("compression-tests").innerHTML =
+    safetyHtml() +
     "<p class='ed-note'>" + D.compression_tests.intro + " Tool: " + D.compression_tests.tool + " <i>Source: " + D.compression_tests.ref + "</i></p>" +
     D.compression_tests.steps.map((s, i) =>
       "<div class='ed-cause'><b>" + (i + 1) + ". " + s.title + "</b>" +
@@ -428,21 +558,41 @@
     "<br>" + c.claim +
     "<br><a href='" + c.url + "' target='_blank' rel='noopener'>Watch on YouTube</a>" +
     "<br><span class='ed-note'>Caveat: " + c.caveat + "</span></div>").join("");
-  /* ---------- torque & specs (FSM #99482-98 §2) ---------- */
+  /* ---------- torque & specs (FSM #99482-98 §2) ----------
+     Rows come from the shared parts core via the data.js index (table id
+     + ordered slug list) — never a bare fastener name, so the Sportster
+     and Softail values for the same fastener stay separate. The Clymer
+     chapter is local (not in the core v1) and renders after the module
+     chapters, same heading + row shape. No core, no torque tables. */
+  function torqueRowsFor(t) {
+    if (!PartsCore) return [];
+    return t.slugs.map((s) => PartsCore.getTorque(t.id, s)).filter(Boolean);
+  }
   function renderTorqueRows(filter) {
     const q = (filter || "").toLowerCase();
-    const rows = D.torque.rows.filter((r) => !q || r.fastener.toLowerCase().includes(q));
+    if (!PartsCore) {
+      $("torque-table").innerHTML = "<p class='ed-note'>Torque tables are not available — the shared parts core did not load. Capacities, pressures and dimensions below are unaffected.</p>";
+      $("torque-chapters").innerHTML = "";
+      return;
+    }
+    const rows = torqueRowsFor(D.torque.sec2).filter((r) => !q || r.fastener.toLowerCase().includes(q));
     $("torque-table").innerHTML = rows.length
       ? rows.map((r) => "<div class='ed-cause'><b>" + r.fastener + "</b><br>" + r.value + "</div>").join("")
       : "<p class='ed-note'>No fastener matches that search.</p>";
     const chapters = D.torque.chapters.map((c) => {
-      const cr = c.rows.filter((r) => !q || r.fastener.toLowerCase().includes(q));
+      const cr = torqueRowsFor(c).filter((r) => !q || r.fastener.toLowerCase().includes(q));
       return cr.length
         ? "<h4>" + c.title + " <span class='ed-note'>(" + c.ref + ")</span></h4>" +
           cr.map((r) => "<div class='ed-cause'><b>" + r.fastener + "</b><br>" + r.value + "</div>").join("")
         : "";
     }).join("");
-    $("torque-chapters").innerHTML = chapters || (q ? "<p class='ed-note'>No chapter fastener matches that search.</p>" : "");
+    const cy = D.torque.clymer;
+    const cyr = cy.rows.filter((r) => !q || r.fastener.toLowerCase().includes(q));
+    const clymerHtml = cyr.length
+      ? "<h4>" + cy.title + " <span class='ed-note'>(" + cy.ref + ")</span></h4>" +
+        cyr.map((r) => "<div class='ed-cause'><b>" + r.fastener + "</b><br>" + r.value + "</div>").join("")
+      : "";
+    $("torque-chapters").innerHTML = (chapters + clymerHtml) || (q ? "<p class='ed-note'>No chapter fastener matches that search.</p>" : "");
   }
   renderTorqueRows("");
   $("torque-search").addEventListener("input", (e) => renderTorqueRows(e.target.value));
@@ -450,7 +600,8 @@
   /* ---------- torque sequences (FSM #99482-98 §3, verified from rendered pages) ---------- */
   const SEQ_SVG_HEAD = "<svg viewBox='0 0 300 230' width='100%' role='img' aria-label='Cylinder head bolt numbering, front and rear heads'><text x='150' y='12' text-anchor='middle' fill='#c8c8c8' font-size='12' letter-spacing='2'>FRONT CYLINDER</text><rect x='10' y='18' width='280' height='80' rx='6' fill='#111111' stroke='#c8c8c8' stroke-width='2'/><g font-size='15' font-weight='bold' text-anchor='middle'><circle cx='50' cy='45' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='50' y='50' fill='#ffffff'>1</text><circle cx='250' cy='45' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='250' y='50' fill='#ffffff'>3</text><circle cx='50' cy='80' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='50' y='85' fill='#ffffff'>2</text><circle cx='250' cy='80' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='250' y='85' fill='#ffffff'>4</text></g><text x='150' y='122' text-anchor='middle' fill='#c8c8c8' font-size='12' letter-spacing='2'>REAR CYLINDER — MIRRORED</text><rect x='10' y='128' width='280' height='80' rx='6' fill='#111111' stroke='#c8c8c8' stroke-width='2'/><g font-size='15' font-weight='bold' text-anchor='middle'><circle cx='50' cy='155' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='50' y='160' fill='#ffffff'>2</text><circle cx='250' cy='155' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='250' y='160' fill='#ffffff'>4</text><circle cx='50' cy='190' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='50' y='195' fill='#ffffff'>1</text><circle cx='250' cy='190' r='14' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='250' y='195' fill='#ffffff'>3</text></g><text x='150' y='226' text-anchor='middle' fill='#c8c8c8' font-size='11'>Simplified schematic — numbering per FSM Fig. 3-16</text></svg>";
   const SEQ_SVG_CASE = "<svg viewBox='0 0 300 260' width='100%' role='img' aria-label='Crankcase fastener numbering, eight positions'><rect x='105' y='8' width='34' height='55' rx='4' fill='#1a1a1a' stroke='#c8c8c8' stroke-width='2' transform='rotate(-20 122 35)'/><rect x='161' y='8' width='34' height='55' rx='4' fill='#1a1a1a' stroke='#c8c8c8' stroke-width='2' transform='rotate(20 178 35)'/><rect x='30' y='45' width='240' height='195' rx='45' fill='#111111' stroke='#c8c8c8' stroke-width='2'/><circle cx='150' cy='150' r='52' fill='#070709' stroke='#c8c8c8' stroke-width='2'/><g font-size='13' font-weight='bold' text-anchor='middle'><circle cx='188' cy='182' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='188' y='187' fill='#ffffff'>1</text><circle cx='150' cy='62' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='150' y='67' fill='#ffffff'>2</text><circle cx='112' cy='182' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='112' y='187' fill='#ffffff'>3</text><circle cx='228' cy='88' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='228' y='93' fill='#ffffff'>4</text><circle cx='52' cy='150' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='52' y='155' fill='#ffffff'>5</text><circle cx='248' cy='150' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='248' y='155' fill='#ffffff'>6</text><circle cx='78' cy='82' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='78' y='87' fill='#ffffff'>7</text><circle cx='212' cy='202' r='12' fill='#1a1a1a' stroke='#9d6bff' stroke-width='2'/><text x='212' y='207' fill='#ffffff'>8</text></g><text x='150' y='256' text-anchor='middle' fill='#c8c8c8' font-size='11'>Simplified schematic — numbering per FSM Fig. 3-88</text></svg>";
-  $("torque-sequences").innerHTML = D.torque.sequences.map((s) =>
+  $("torque-sequences").innerHTML = PartsCore
+    ? D.torque.sequences.map((id) => PartsCore.getTorqueSequence(id)).filter(Boolean).map((s) =>
     "<div class='ed-cause'><h4>" + s.title + " <span class='ed-note'>(" + s.ref + ")</span></h4>" +
     "<p class='ed-note'>Numbering: " + s.figure + "</p>" +
     (s.id === "head-bolts" ? SEQ_SVG_HEAD : SEQ_SVG_CASE) +
@@ -458,11 +609,37 @@
     (s.prep ? "<p>Before you start:</p><ul>" + s.prep.map((p) => "<li>" + p + "</li>").join("") + "</ul>" : "") +
     "<ol>" + s.passes.map((p) => "<li><b>" + p.value + "</b> — order " + p.order + (p.note ? " (" + p.note + ")" : "") + "</li>").join("") + "</ol>" +
     (s.repeat ? "<p>" + s.repeat + "</p>" : "") +
-    (s.note ? "<p class='ed-note'>" + s.note + "</p>" : "") + "</div>").join("");
+    (s.note ? "<p class='ed-note'>" + s.note + "</p>" : "") + "</div>").join("")
+    : "<p class='ed-note'>Torque sequences are not available — the shared parts core did not load.</p>";
   $("torque-pressures").innerHTML = "<p>" + D.torque.tire_pressures.flstc + "</p><p>" + D.torque.tire_pressures.fxstc + "</p><p class='ed-note'>" + D.torque.tire_pressures.note + "</p>";
   $("torque-dims").innerHTML = D.torque.dimensions.map((d) =>
     "<div class='ed-cause'><b>" + d.model + "</b> — " + d.length + " long · " + d.wheelbase + " wheelbase · " + d.saddle + " saddle · " + d.height + " high · " + d.dry + " dry · " + d.gvwr + " GVWR</div>").join("") +
     "<p class='ed-note'>Source: " + D.torque.source + "</p>";
+
+  /* ---------- Sportster numbers (batch 2): Clymer, aftermarket, Sportster
+     only — never factory, never a correction to the Softail numbers. --- */
+  $("sportster-jetting").innerHTML =
+    "<p>" + D.sportster_cv_jetting.note + " <i>Source: " + D.sportster_cv_jetting.source + "</i></p>" +
+    ["usExceptCalifornia", "california", "hdi", "swiss"].map((k) => {
+      const m = D.sportster_cv_jetting[k];
+      return "<h4>" + m.label + "</h4>" +
+        "<p><b>Main jets</b><br>" + m.main.map((r) => "<b>" + r.years + ":</b> 883 main " + r.m883 + " · 1200 main " + r.m1200 + (r.m1200S ? " · 1200S main " + r.m1200S : "") + (r.note ? " (" + r.note + ")" : "")).join("<br>") + "</p>" +
+        "<p><b>Pilot jets</b><br>" + m.pilot.map((r) => "<b>" + r.years + ":</b> 883 pilot " + r.m883 + " · 1200 pilot " + r.m1200).join("<br>") + "</p>";
+    }).join("") +
+    "<h4>Float height</h4><p>" + D.sportster_cv_jetting.floatHeight.map((f) => "<b>" + f.years + ":</b> " + f.value).join("<br>") + "</p>" +
+    "<p class='ed-note'>Source: " + D.sportster_cv_jetting.source + " — Clymer (aftermarket). Sportster only; never a correction to the Softail CV40 numbers (main 185 / pilot 45).</p>";
+  $("sportster-tires").innerHTML =
+    "<p>" + D.sportster_tire_pressures.note + " <i>Source: " + D.sportster_tire_pressures.source + "</i></p>" +
+    [["upTo300lb", "Up to 300 lb load"], ["upToGVWR", "Up to GVWR"]].map(([k, title]) => {
+      const g = D.sportster_tire_pressures[k];
+      const rows = (list) => list.map((r) => "<b>" + r.models + ":</b> " + r.psi + " psi (" + r.kpa + " kPa)").join("<br>");
+      return "<h4>" + title + "</h4><p><b>Front</b><br>" + rows(g.front) + "</p><p><b>Rear</b><br>" + rows(g.rear) + "</p>";
+    }).join("") +
+    "<p class='ed-note'>Source: " + D.sportster_tire_pressures.source + " — Clymer (aftermarket). Sportster only.</p>";
+  $("sportster-fork-oil").innerHTML =
+    "<p>" + D.sportster_fork_oil.note + " <i>Source: " + D.sportster_fork_oil.source + "</i></p>" +
+    D.sportster_fork_oil.rows.map((r) => "<div class='ed-cause'><b>" + r.years + "</b><br>Wet: " + r.wetOz + " oz (" + r.wetMl + " ml) · Dry: " + r.dryOz + " oz (" + r.dryMl + " ml)</div>").join("") +
+    "<p class='ed-note'>Source: " + D.sportster_fork_oil.source + " — Clymer (aftermarket). Sportster only.</p>";
 
   /* ---------- shop tab: plug reader, wire/fuse, gear ratio, tap & drill,
      bolt ID, oil, compression ratio, carb CFM, sag, interchange, pre-ride.
@@ -622,6 +799,7 @@
   renderCfm();
   /* 9. Sag setter */
   $("sag-setter").innerHTML =
+    safetyHtml() +
     "<h4>Preload adjustment (FSM §2 p. 2-73)</h4>" +
     "<ol>" + SH.sag.procedure.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
     "<p class='ed-note'>" + SH.sag.magazine + "</p>" +
@@ -725,27 +903,59 @@
     el.innerHTML = html;
   });
 
-  /* ---------- data: history, export / import ---------- */
+  /* ---------- data: history, export / import ----------
+     Diagnosis history (batch 2): one record per finished diagnosis — date,
+     bike, tree, answers, ranked causes, safe-to-ride verdict, top-cause
+     result, wizard context when the tree came from the wizard. Records are
+     appended, never overwritten; the rider deletes individual entries from
+     the detail view. The bike filter shows one bike's record. */
+  let viewedHist = null;
   function renderHistory() {
     const el = $("history-list");
     const detail = $("history-detail");
-    if (!state.sessions.length) { el.innerHTML = "<p class='ed-note'>No saved sessions yet — run a tree and tap Save session.</p>"; return; }
-    el.innerHTML = state.sessions.map((s, i) => {
-      const bike = allBikes().find((b) => b.id === s.bike);
-      const tree = D.trees.find((t) => t.id === s.tree);
-      return "<button class='ed-tree-btn' data-hist='" + i + "'><b>" + (tree ? tree.title : s.tree) + "</b><br><span class='ed-note'>" + (bike ? bike.name : s.bike) + " · " + new Date(s.when).toLocaleString() + " · top cause: " + (s.ranked && s.ranked[0] ? s.ranked[0] : "—") + "</span></button>";
+    const filterSel = $("history-bike");
+    const cur = filterSel.value || "";
+    filterSel.innerHTML = "<option value=''>All bikes</option>" +
+      allBikes().map((b) => "<option value='" + b.id + "'" + (b.id === cur ? " selected" : "") + ">" + b.name + "</option>").join("");
+    if (!state.sessions.length) {
+      el.innerHTML = "<p class='ed-note'>No saved sessions yet — run a tree and tap Save session.</p>";
+      detail.innerHTML = "";
+      return;
+    }
+    const rows = state.sessions.map((s, i) => ({ s, i })).filter((r) => !cur || r.s.bike === cur);
+    if (!rows.length) {
+      el.innerHTML = "<p class='ed-note'>No saved diagnoses for this bike yet.</p>";
+      detail.innerHTML = "";
+      return;
+    }
+    el.innerHTML = rows.map((r) => {
+      const bike = allBikes().find((b) => b.id === r.s.bike);
+      const tree = D.trees.find((t) => t.id === r.s.tree);
+      return "<button class='ed-tree-btn' data-hist='" + r.i + "'><b>" + (tree ? tree.title : r.s.tree) + "</b><br><span class='ed-note'>" + (bike ? bike.name : r.s.bike) + " · " + new Date(r.s.when).toLocaleString() + " · top cause: " + (r.s.ranked && r.s.ranked[0] ? r.s.ranked[0] : "—") + "</span></button>";
     }).reverse().join("");
     el.querySelectorAll("[data-hist]").forEach((btn) => btn.addEventListener("click", () => {
-      const s = state.sessions[parseInt(btn.dataset.hist, 10)];
+      viewedHist = parseInt(btn.dataset.hist, 10);
+      const s = state.sessions[viewedHist];
       const tree = D.trees.find((t) => t.id === s.tree);
       const bike = allBikes().find((b) => b.id === s.bike);
       detail.innerHTML = "<h3>" + (tree ? tree.title : s.tree) + " — " + (bike ? bike.name : s.bike) + "</h3>" +
         "<p class='ed-note'>" + new Date(s.when).toLocaleString() + "</p>" +
+        (s.verdict ? "<p><b>Safe to ride?</b> " + s.verdict + "</p>" : "") +
+        (s.wizard ? "<p class='ed-note'>Wizard: " + ED_Wizard.describe(s.wizard.area, s.wizard.when, s.wizard.urgency) + "</p>" : "") +
         (s.answers || []).map((a) => "<p>" + a.q + "<br><b>" + a.a + "</b></p>").join("") +
-        "<p><b>Ranked causes:</b><br>" + (s.ranked || []).map((c, i) => (i + 1) + ". " + c).join("<br>") + "</p>";
+        "<p><b>Ranked causes:</b><br>" + (s.ranked || []).map((c, i) => (i + 1) + ". " + c).join("<br>") + "</p>" +
+        "<button class='ed-btn ghost' id='hist-delete'>Delete this entry</button>";
+      $("hist-delete").addEventListener("click", () => {
+        state.sessions.splice(viewedHist, 1);
+        store.save(state);
+        viewedHist = null;
+        detail.innerHTML = "";
+        renderHistory();
+      });
       detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }));
   }
+  $("history-bike").addEventListener("change", renderHistory);
   renderHistory();
   $("export").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -762,10 +972,10 @@
     rd.onload = () => {
       try {
         const j = JSON.parse(rd.result);
-        state = { sessions: j.sessions || [], baselines: j.baselines || {}, bike: j.bike || "b1", bikes: j.bikes || [] };
+        state = { sessions: j.sessions || [], baselines: j.baselines || {}, bike: j.bike || "b1", bikes: j.bikes || [], in_progress: j.in_progress || null };
         store.save(state);
         renderBikeSel();
-        renderBaselines(); renderCarbs(); renderHistory();
+        renderBaselines(); renderCarbs(); renderHistory(); renderResume();
         alert("Imported.");
       } catch (err) { alert("That file is not a valid export."); }
     };

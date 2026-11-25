@@ -418,16 +418,18 @@ const ED_DATA = {
         { q: "Roll-off test: near peak torque (3,500-4,500 rpm), full throttle, roll off to about 3/4. Does it pick up speed?", yes: "main-lean", no: "next", note: "Picks up = too lean. Hesitates = too large. Just slows = within one size.", cite: "Easyriders ER_153" },
         { q: "Look at a plug (see Plug Reader). Is the insulator white or very light tan?", yes: "main-lean", no: "next", note: "White = lean. Tan = about right. Black/sooty = rich.", cite: "1984-1999 Softail Repair Manual" },
         { q: "Set the best idle with the mixture screw, then count the turns open. Is best idle under 1/2 turn out (Keihin)?", yes: "turncount", no: "next", note: "Best idle under 1/2 turn = idle jet too big; over 1-1/4 turns = too small. Keihin only — S&S Super E uses 1 to 1-1/2 turns.", cite: "Easyriders ER_153 §28 (not an FSM cause)" },
-        { q: "Does the idle hang around 1,600 rpm, then drop off on its own?", yes: "advance", no: "next", note: "A worn advance mechanism with weak return springs hangs the idle high until the advancer finally returns. Check the advancer before touching the carb.", cite: "Easyriders ER_166 §69 (not an FSM cause)" }
+        { q: "Does the idle hang around 1,600 rpm, then drop off on its own?", yes: "advance", no: "next", note: "A worn advance mechanism with weak return springs hangs the idle high until the advancer finally returns. Check the advancer before touching the carb.", cite: "Easyriders ER_166 §69 (not an FSM cause)" },
+        { q: "Is the float-bowl breather tube pinched, kinked, or pointed into the wind?", yes: "bowl-breather", no: "next", note: "Pinching the breather tube, or pointing it into the wind, changes the pressure in the float bowl and messes up the tune. The breather belongs in still air.", cite: "Easyriders Tech Tips Vol. 2, §36 (not an FSM cause)" }
       ],
       causes: [
         { cause: "Intake leak at the manifold seals", weight: 25, test: "Carb-cleaner spray test at the seals (see step 3); Evolution Big Twin compliance fittings are particularly troublesome — many maladies unjustly blamed on the carb are caused by leaking intake seals (Easyriders Tips Vol. 3, PDF p. 27)", fix: "Replace intake seals; re-torque manifold", urgency: "medium", ride: "Rideable short distance, fix soon - a lean idle can overheat the rear cylinder." , part: "intake-seals" },
         { cause: "Intermediate (slow) jet too small / mixture screw mis-set", weight: 25, test: "Set intermediate first, then mixture screw per S&S order; re-check warm idle 1000-1050 rpm. Never force the mixture screw — an over-tightened screw can crack the carb body at the screw hole (S&S Super B, Easyriders Tips Vol. 3, PDF p. 28)", fix: "S&S order: intermediate jet first, main jet last; mixture screw 1-1/4 turns out baseline", urgency: "medium", ride: "Rideable if it holds idle warm; do not ride if it dies at stops." },
         { cause: "Main jet too small", weight: 15, test: "Roll-off test at 3,500-4,500 rpm (see step 5)", fix: "Go up one main size, re-test", urgency: "low", ride: "Rideable; fix when convenient." },
-        { cause: "Enrichener circuit stuck or misadjusted", weight: 10, test: "Enrichener cable free play + plunger seating", fix: "Free the cable, seat the plunger", urgency: "low", ride: "Rideable." },
+        { cause: "Enrichener circuit stuck or misadjusted", weight: 5, test: "Enrichener cable free play + plunger seating", fix: "Free the cable, seat the plunger", urgency: "low", ride: "Rideable." },
         { cause: "Keihin rubber plug missing (CV40 only): all gas passes through the main jet first and the idle jet is fed through it - plug left out runs like the choke is on", weight: 10, test: "Open the carb, check the rubber plug is in place", fix: "Refit the plug", urgency: "medium", ride: "Rideable but running rich; fix soon.", applies: "b2" , part: "carb-body" },
         { cause: "Idle jet wrong size — mixture-screw turn-count diagnosis (Keihin)", weight: 10, test: "Warm engine, set best idle with the mixture screw, count turns open: under 1/2 turn = jet too big; over 1-1/4 turns = jet too small", fix: "Change the idle (slow) jet one size in the indicated direction, re-set the mixture screw", urgency: "low", ride: "Rideable; fix when convenient.", part: "pilot-jet", source: "NOT an FSM cause — Easyriders ER_153 §28 (Keihin butterfly carb). S&S Super E uses 1–1 1/2 turns instead (ER_166 §72)." },
-        { cause: "Worn advance mechanism — idle hangs ~1,600 rpm then drops", weight: 5, test: "Idle hangs high then falls off on its own; inspect the advance mechanism for weak return springs / binding", fix: "Free or replace the advance mechanism; do the carb last", urgency: "low", ride: "Rideable.", part: "ignition-module", source: "NOT an FSM cause — Easyriders ER_166 §69." }
+        { cause: "Worn advance mechanism — idle hangs ~1,600 rpm then drops", weight: 5, test: "Idle hangs high then falls off on its own; inspect the advance mechanism for weak return springs / binding", fix: "Free or replace the advance mechanism; do the carb last", urgency: "low", ride: "Rideable.", part: "ignition-module", source: "NOT an FSM cause — Easyriders ER_166 §69." },
+        { cause: "Float-bowl breather pinched or pointed into the wind — erratic carb tune", weight: 5, test: "Carb tune goes erratic for no other reason; check the float-bowl breather tube — pinched, kinked, or pointed into the wind instead of still air", fix: "Free the breather tube and route it into still air", urgency: "low", ride: "Rideable; fix when convenient.", source: "NOT an FSM cause — Easyriders Tech Tips Vol. 2, §36 (Keihin tuning; Joe Minton)." }
       ]
     },
     {
@@ -441,16 +443,18 @@ const ED_DATA = {
         { q: "Pull a plug, ground it, crank. Do you see a strong blue spark?", yes: "fuel", no: "ignition", note: "Weak or yellow spark = coil, cables, or VOES. Strong spark = look at fuel.", cite: "FSM #99482-98 section 8" },
         { q: "Does the starter spin fast without turning the engine, or click then spin free?", yes: "jackshaft", no: "next", note: "A starter that spins without engaging points at the jackshaft / starter drive — binding, sticking, or a shaft/cover mismatch.", cite: "Easyriders ER_305 §18; ER_295 §139 (not an FSM cause)" },
         { q: "Sportster 1995–2003: is there fuel at the carb with the vacuum hose connected?", yes: "vacuum", no: "next", note: "The vacuum fuel valve only flows with engine vacuum on its diaphragm hose. No vacuum = no fuel.", cite: "sportster-86-03-trouble p. 55" },
-        { q: "Does it crank slow and sluggish, or kick back against the starter?", yes: "stuck", no: "next", note: "Mechanical advance weights stuck in the full-advance position light the charge at/before TDC at cranking speed. Do NOT rewire the cranking circuit to fix this — that removes a safety interlock.", cite: "Easyriders Tips Vol. 3, PDF pp. 49–50 (not an FSM cause)" }
+        { q: "Does it crank slow and sluggish, or kick back against the starter?", yes: "stuck", no: "next", note: "Mechanical advance weights stuck in the full-advance position light the charge at/before TDC at cranking speed. Do NOT rewire the cranking circuit to fix this — that removes a safety interlock.", cite: "Easyriders Tips Vol. 3, PDF pp. 49–50 (not an FSM cause)" },
+        { q: "Has the bike been parked for weeks or months, and does it act fuel-starved — runs, then dies, or cranks without firing?", yes: "screens", no: "next", note: "Petcock filter screens inside the tank block up with rust flaking off the tank walls while the bike sits. Check this before taking the carb apart.", cite: "Easyriders Tech Tips Vol. 2, §16 (not an FSM cause)" }
       ],
       causes: [
         { cause: "Battery discharged or failed", weight: 25, test: "Charge, then load-test; check voltage at rest (12.6V+) and cranking. If the leads are eaten by acid under the insulation, cleaning the terminals won't fix it — replace the leads; a wire broken inside its insulation looks identical to a good one (Easyriders Tips Vol. 3, PDF p. 127)", fix: "Charge or replace; check charging system after", urgency: "high", ride: "Do not ride - it will strand you." , part: "battery" },
         { cause: "Ignition fault (coil, cables, VOES, timing)", weight: 25, test: "Spark test, then coil 2.5-3.1 ohm (stock) / VOES closes 3.5-4.5 inHg / timing 20 deg BTDC", fix: "Replace the failed part; see Ignition Timing Helper", urgency: "high", ride: "Do not ride until it fires reliably." , part: ["coil", "plug-wires", "voes"] },
-        { cause: "Fuel delivery (petcock, filter, carb)", weight: 20, test: "Fuel flow at the carb; petcock on RESERVE test; float bowl has fuel", fix: "Clean/replace filter; check float 0.413-0.453 in (CV40)", urgency: "medium", ride: "Do not ride until it runs." , part: ["carb-body", "float"] },
+        { cause: "Fuel delivery (petcock, filter, carb)", weight: 15, test: "Fuel flow at the carb; petcock on RESERVE test; float bowl has fuel", fix: "Clean/replace filter; check float 0.413-0.453 in (CV40)", urgency: "medium", ride: "Do not ride until it runs." , part: ["carb-body", "float"] },
         { cause: "Starter or cables", weight: 10, test: "Voltage drop across cables while cranking (<0.2 V per leg — Clymer p. 47); starter draw", fix: "Clean/tighten cables; rebuild or replace starter", urgency: "medium", ride: "Do not ride until it cranks normally." , part: "starter" },
         { cause: "Jackshaft worn or mismatched — starter spins but won't engage", weight: 10, test: "Starter spins fast / clicks then spins free without turning the engine; check jackshaft binding, sticking, alignment, and starter-shaft length vs the outer primary cover (H-D shaft 31482-70 is ~1/4 in longer than the one it replaces)", fix: "Realign / tighten the jackshaft assembly or replace it; fit the correct-length starter shaft for the cover", urgency: "high", ride: "Do not ride until it cranks reliably.", part: "starter", source: "NOT an FSM cause — Easyriders ER_305 §18; starter table ER_295 §139." },
         { cause: "Vacuum petcock valve not opening (1995–2003 Sportster)", weight: 5, test: "Vacuum hose carb to valve diaphragm intact and connected; no vacuum = no fuel flow", fix: "Refit/replace the hose or valve", urgency: "medium", ride: "Do not ride until it runs.", source: "sportster-86-03-trouble p. 55. Full test steps continue onto p. 56 — not yet added." },
-        { cause: "Advance weights stuck at full advance — slow, sluggish cranking / kickback", weight: 5, test: "Slow sluggish cranking or kickback; check that the mechanical advance weights move freely and are lubricated with light oil", fix: "Free and lubricate the advance weights; replace worn parts", urgency: "medium", ride: "Do not ride until it cranks normally.", source: "NOT an FSM cause — Easyriders Tips Vol. 3, PDF pp. 49–50. Distinct from the worn advance mechanism (ER_166 §69) — this is stuck, not worn." }
+        { cause: "Advance weights stuck at full advance — slow, sluggish cranking / kickback", weight: 5, test: "Slow sluggish cranking or kickback; check that the mechanical advance weights move freely and are lubricated with light oil", fix: "Free and lubricate the advance weights; replace worn parts", urgency: "medium", ride: "Do not ride until it cranks normally.", source: "NOT an FSM cause — Easyriders Tips Vol. 3, PDF pp. 49–50. Distinct from the worn advance mechanism (ER_166 §69) — this is stuck, not worn." },
+        { cause: "Petcock filter screens blocked by rust after storage — fuel starvation", weight: 5, test: "Bike sat parked for weeks or months (winter storage) and acts fuel-starved — runs then dies, or cranks without firing; drain the tank, pull the petcock and inspect the filter screens inside the tank for rust flakes", fix: "Clean or replace the petcock filter screens; replace hard or cracked fuel lines; reseal threads with Teflon tape", urgency: "medium", ride: "Do not ride until it runs.", source: "NOT an FSM cause — Easyriders Tech Tips Vol. 2, §16 (Gary's Fix-It Forum: petcock filter)." }
       ]
     },
     {
@@ -570,17 +574,19 @@ const ED_DATA = {
         { q: "At speed, does the front end wobble — and with the front wheel off the ground, does the front end rattle fore-aft?", yes: "steering", no: "next", note: "Poorly adjusted steering-head bearings are the most common wobble cause. Fall-away test: wheel straight, push it aside — it should start falling after ~2 inches.", cite: "Easyriders ER_205 §36 (not an FSM cause)" },
         { q: "Is the fork oil wrong, or is it leaking from the top-clamp bolt?", yes: "forkoil", no: "next", note: "Evo forks want 5–20 weight; volume matters as much as weight. The top-clamp bolt has NO O-ring and is the most common fork-leak source.", cite: "Easyriders ER_205 §37–§38 (not an FSM cause)" },
         { q: "Spoked wheel: tap each spoke — do they ring at different pitches, or are some dead?", yes: "spoke", no: "next", note: "A spoke rings when tapped; pitch = tension. A big pitch difference after truing means a bent rim. Check spoke tightness every ~5,000 miles (magazine interval).", cite: "Easyriders Tips Vol. 3, PDF p. 73 (not an FSM cause)" },
-        { q: "Does it behave one way turning left and another turning right — worse with speed?", yes: "track", no: "next", note: "Even a slight difference in the track of the two wheels affects steering; the difference grows with speed.", cite: "Easyriders Tips Vol. 3, PDF p. 64 (not an FSM cause)" }
+        { q: "Does it behave one way turning left and another turning right — worse with speed?", yes: "track", no: "next", note: "Even a slight difference in the track of the two wheels affects steering; the difference grows with speed.", cite: "Easyriders Tips Vol. 3, PDF p. 64 (not an FSM cause)" },
+        { q: "Does it wobble or weave at high speed even with the pressures right and the steering head tight?", yes: "weave", no: "next", note: "Choose the wrong tire and you'll have a wobble or weave at high speed. Too little air also makes a bike wobble — check pressure first (step 1).", cite: "Easyriders Tech Tips Vol. 2, §97–§98 (not an FSM cause)" }
       ],
       causes: [
         { cause: "Wrong tire pressure", weight: 30, test: "Gauge reading cold vs the table above; replace when the wear bar is flush with the tread or tread depth equals the width of two new nickels (Easyriders ER_150 §36)", fix: "Set to factory pressure", urgency: "medium", ride: "Rideable once pressures are set." },
         { cause: "Tire age (10+ years)", weight: 20, test: "DOT date code", fix: "Replace the tire", urgency: "high", ride: "Do not ride far on a 10-year-old tire." },
         { cause: "Wheel bearings / balance", weight: 15, test: "Wheel play check; bearings every 10,000 mi", fix: "Replace bearings (9052, two per wheel)", urgency: "medium", ride: "Rideable short distance; get it checked." , part: "wheel-bearing" },
-        { cause: "Suspension (fork seals, shocks)", weight: 10, test: "Fork oil leaks; shock damping test", fix: "Seals / shocks", urgency: "low", ride: "Rideable." , part: ["fork", "shocks"] },
+        { cause: "Suspension (fork seals, shocks)", weight: 5, test: "Fork oil leaks; shock damping test", fix: "Seals / shocks", urgency: "low", ride: "Rideable." , part: ["fork", "shocks"] },
         { cause: "Steering-head loose / worn — wobble", weight: 10, test: "Front wheel off the ground: grab the lower fork legs, push/pull fore-aft — rattle or click = loose bearings; fall-away test (should start falling after ~2 in); falls after the first inch = too loose; sticks at 3 in = too tight; tight AND loose spots as you swing = dented/worn bearings, replace (Easyriders Tips Vol. 3, PDF p. 75)", fix: "Adjust / replace steering-head bearings; use light chassis grease, not heavy wheel-bearing grease", urgency: "high", ride: "Do not ride fast with a wobble.", part: "fork", source: "NOT an FSM cause — Easyriders ER_205 §36." },
         { cause: "Fork oil level/weight wrong, or leak at the top-clamp bolt", weight: 5, test: "Harsh ride (too heavy / too much oil) or loose front end (too light / too little); leak at the top-clamp bolt; new seals leak again if the tube has nicks — stone them out with 400-grit first (Easyriders Tips Vol. 3, PDF p. 76)", fix: "Set oil to 5–20 weight and correct volume (change ~every 10,000 mi); a garden-hose washer under the top bolt seals the O-ring-less clamp bolt", urgency: "low", ride: "Rideable.", part: "fork", source: "NOT an FSM cause — Easyriders ER_205 §37–§38." },
         { cause: "Loose spokes — crooked wheel, instability", weight: 5, test: "Tap each spoke with a small tool: pitch = tension; a big pitch difference after truing means a bent rim", fix: "True the wheel and tension the spokes; replace a bent rim", urgency: "high", ride: "Do not ride fast on loose spokes.", source: "NOT an FSM cause — Easyriders Tips Vol. 3, PDF p. 73." },
-        { cause: "Wheels not on the same track — asymmetric handling", weight: 5, test: "Behaves one way turning left, another turning right, worse with speed; check front/rear wheel alignment", fix: "Align the wheels to the same track", urgency: "medium", ride: "Rideable carefully; fix soon.", source: "NOT an FSM cause — Easyriders Tips Vol. 3, PDF p. 64." }
+        { cause: "Wheels not on the same track — asymmetric handling", weight: 5, test: "Behaves one way turning left, another turning right, worse with speed; check front/rear wheel alignment", fix: "Align the wheels to the same track", urgency: "medium", ride: "Rideable carefully; fix soon.", source: "NOT an FSM cause — Easyriders Tips Vol. 3, PDF p. 64." },
+        { cause: "Wrong tire for the bike — high-speed wobble / weave", weight: 5, test: "Wobble or weave shows up at high speed with pressures right and the steering head tight; tire construction wrong for the bike — a stiff heavy-touring tire on a rigid, or a mismatched set", fix: "Fit premium tires suited to the bike; ask other riders what works on the same model", urgency: "medium", ride: "Rideable carefully; fix soon — a high-speed weave is not a shrug.", source: "NOT an FSM cause — Easyriders Tech Tips Vol. 2, §97–§98 (tire choice; wobble or weave at high speed)." }
       ]
     },
     {
@@ -620,15 +626,17 @@ const ED_DATA = {
         { q: "Does it drag — hard to find neutral, or the bike creeps in gear with the lever pulled?", yes: "drag", no: "next", note: "Drag = adjustment or warped plates.", cite: "1984-1999 Softail Repair Manual" },
         { q: "Is clutch lever free play outside 1/16-1/8 in?", yes: "cable", no: "next", note: "Free play is measured at the lever. Out of range = adjust before replacing anything.", cite: "FSM #99482-98 p. 272" },
         { q: "Is the lever hard to pull halfway through — or does the clutch slip with a good cable?", yes: "dished", no: "next", note: "The diaphragm spring must sit flat (within .010 in of a straightedge). A/B/C adjuster-plate holes set how much it is compressed.", cite: "Easyriders ER_167 §71 (not an FSM cause)" },
-        { q: "Does it grind going into first, creep in gear, or refuse neutral at a stop?", yes: "gummed", no: "next", note: "Oil vapor + clutch dust form a black gum that glues plates together; too much grease on the hub rollers does the same.", cite: "Easyriders ER_258 §41 (not an FSM cause)" }
+        { q: "Does it grind going into first, creep in gear, or refuse neutral at a stop?", yes: "gummed", no: "next", note: "Oil vapor + clutch dust form a black gum that glues plates together; too much grease on the hub rollers does the same.", cite: "Easyriders ER_258 §41 (not an FSM cause)" },
+        { q: "With the pushrod and cable adjusted, pull the clutch lever and watch the pressure plate lift. Does it tilt as it lifts instead of coming off the pack squarely?", yes: "pushrod", no: "next", note: "A wobbly spring retainer doesn't matter as long as the plate runs straight when released — but a tilting plate drags. Grooves worn in the pushrod where it rides in the mainshaft bushings let it fall off-center.", cite: "Easyriders Tech Tips Vol. 4, §79–§80 (not an FSM cause)" }
       ],
       causes: [
         { cause: "Worn clutch plates / springs", weight: 30, test: "Slip test under load", fix: "Replace plates/springs; primary cover screws 108-120 in-lbs", urgency: "medium", ride: "Rideable if it is not slipping badly." , part: "clutch" },
         { cause: "Clutch drag — adjustment or warped plates", weight: 25, test: "Free play 1/16-1/8 in at the lever; drag test at a stop. Drag sources: warped plates (pressure plate lifts only ~1/8 in), over-tight primary chain pulling the basket off-center, oil too thick (STP locks the clutch solid) — Easyriders ER_167 §69", fix: "Adjust cable and clutch pack; replace warped plates", urgency: "medium", ride: "Rideable; fix before it gets worse." , part: "clutch" },
         { cause: "Cable / adjustment", weight: 20, test: "Free play 1/16-1/8 in", fix: "Adjust the cable", urgency: "low", ride: "Rideable." },
-        { cause: "Primary oil wrong or low", weight: 10, test: "Primary oil level — 1997: 32 oz, 1998: 26 oz", fix: "Correct oil and level", urgency: "low", ride: "Rideable." },
+        { cause: "Primary oil wrong or low", weight: 5, test: "Primary oil level — 1997: 32 oz, 1998: 26 oz", fix: "Correct oil and level", urgency: "low", ride: "Rideable." },
         { cause: "Diaphragm spring dished — wrong A/B/C holes, spring not flat", weight: 10, test: "Lever hard halfway through, or slip; straightedge across the spring — no more than .010 in gap or it slips; 'C' holes compress least, 'B' most", fix: "Pick the holes that leave the spring flat; back the adjuster screw out 3/4 turn, locknut; convex side of the diaphragm must face out (Easyriders Tips Vol. 3, PDF p. 48)", urgency: "medium", ride: "Rideable; fix soon.", part: "clutch", source: "NOT an FSM cause — Easyriders ER_167 §71. 3/4 turn sits inside the FSM 1/2–1 turn range." },
-        { cause: "Plates gummed together — creep, grind into first, no neutral", weight: 5, test: "Grinds neutral to first, can't find neutral stopped, bike creeps/bumps forward in gear; black gum streaks on the steel plates", fix: "Clean plates with non-oily solvent (brake/contact cleaner, lacquer thinner); lightly sand 120–180 grit; never soak linings (they swell), never water (rust); repeat every 5,000 miles", urgency: "medium", ride: "Rideable; fix soon.", part: "clutch", source: "NOT an FSM cause — Easyriders ER_258 §41." }
+        { cause: "Plates gummed together — creep, grind into first, no neutral", weight: 5, test: "Grinds neutral to first, can't find neutral stopped, bike creeps/bumps forward in gear; black gum streaks on the steel plates", fix: "Clean plates with non-oily solvent (brake/contact cleaner, lacquer thinner); lightly sand 120–180 grit; never soak linings (they swell), never water (rust); repeat every 5,000 miles", urgency: "medium", ride: "Rideable; fix soon.", part: "clutch", source: "NOT an FSM cause — Easyriders ER_258 §41." },
+        { cause: "Pressure plate lifts uneven — release pushrod grooved or unsupported, mainshaft bent", weight: 5, test: "With the pushrod and cable adjusted, pull the lever and watch the pressure plate lift: it must come off the pack squarely. If it tilts, adjust the spring retainer nuts in or out until it lifts square; then check the release pushrod for grooves where it rides in the mainshaft bushings and the mainshaft for runout (article max .003 in)", fix: "Adjust retainer nuts for a square lift; replace a grooved pushrod or a bent mainshaft; check the hub key and thrust lining for damage", urgency: "medium", ride: "Rideable; fix soon — a dragging clutch grinds shifts and won't find neutral.", source: "NOT an FSM cause — Easyriders Tech Tips Vol. 4, §79–§80 (Rick Diaz clutch fix; same article as ER_258 §41 gummed plates)." }
       ]
     },
     {
@@ -696,62 +704,62 @@ const ED_DATA = {
         { cause: "Shifter lever set too low — can't reach 3rd (esp. forward controls)", weight: 10, test: "No 3rd gear after forward controls fitted, or with big boots; tapping the lever down slightly after 2nd makes 3rd appear", fix: "Raise/adjust the foot shifter lever for clearance", urgency: "low", ride: "Rideable if every gear engages fully.", part: "transmission", source: "NOT an FSM cause — Easyriders ER_297 §136 (1990 Softail Custom case)." },
         { cause: "Shift forks off-center — gears don't engage fully, jumps out", weight: 5, test: "Jumps out of gear under load after linkage + pawl are right; forks must sit exactly mid-gear-set (shims on fork shafts, feeler gauges); clutch gears at least 3/4 into each gear", fix: "Center the forks; shop job if the cases have to open", urgency: "high", ride: "Do not ride far — a gear jumping out under load can lock or throw the bike.", part: "transmission", source: "NOT an FSM cause — Easyriders ER_259 §64." }
       ]
+    },
+    {
+      /* Smoking / oil consumption (batch 2, Nov 25, 2026). FSM spine:
+         FSM #99482-98 §3 pp. 3-11–3-12 ("Diagnosing Smoking Engine or High
+         Oil Consumption" + compression / leakdown diagnostic chart).
+         Magazine cause: Easyriders Tech Tips Vol. 3, Carl Morrow FXRS
+         hop-up (over-rev after rev-limiter removal) — flagged as NOT an
+         FSM cause. Sportster note: white smoke/steam after a cold start is
+         normal condensation (Sportster 86-03 p. 89; sportster-86-03-trouble
+         p. 58). Weights sum to 100.
+         Two deliberate deviations from the draft, both to keep the app
+         honest: (1) step 1's yes/no was "smoke-color" — changed to "next",
+         because scoring only bumps on a YES and a blue-gray YES must never
+         bump the white-steam cause; (2) the rings cause carried
+         part: "piston-rings", dropped — no piston-ring price is verified
+         in the parts core (pg-parts-core.js) and the suite enforces every
+         part key exists there.
+         Every source string, cite, note, weight, test, fix, urgency and
+         ride verdict is exactly as drafted. */
+      id: "smoking-oil-consumption",
+      system: "Engine / oil",
+      title: "Smoking exhaust / high oil consumption",
+      steps: [
+        { q: "Is the smoke blue-gray (not white steam, not black soot)?", yes: "next", no: "next", note: "Blue-gray smoke is burning oil. White steam right after a cold start is normal condensation (Sportster 86-03 p. 89). Black soot is rich running — see the rich-running tree.", cite: "FSM #99482-98 §3 p. 3-11; sportster-86-03 p. 89" },
+        { q: "Is oil consumption above normal — needing top-ups between changes?", yes: "next", no: "next", note: "Above-normal oil use plus blue-gray smoke plus low compression points at the rings (FSM §3 p. 3-11). Either symptom alone narrows less.", cite: "FSM #99482-98 §3 p. 3-11" },
+        { q: "Is the oil level above the full mark — was it overfilled?", yes: "overfill", no: "next", note: "Overfill is on the FSM inspect list for a smoking engine. Check the level on a level surface, engine warm, before tearing anything down.", cite: "FSM #99482-98 §3 p. 3-12" },
+        { q: "Compression test (engine warm, throttle wide open, 5–7 strokes): is either cylinder below 90 psi, or more than 10% apart between cylinders?", yes: "next", no: "seals", note: "90 psi minimum AND no more than 10% variance between cylinders is the FSM pass line. Below it, the wet test and leakdown test separate rings from valves from gasket.", cite: "FSM #99482-98 §3 p. 3-11" },
+        { q: "Wet test — about 1/2 oz (15 ml) oil in each cylinder, repeat the test: does compression rise considerably?", yes: "rings", no: "next", note: "A considerable rise on the wet test means worn piston rings. No real rise means valve trouble or a head gasket leak.", cite: "FSM #99482-98 §3 p. 3-12 (diagnostic chart)" },
+        { q: "Leakdown test: is air escaping through the exhaust pipe?", yes: "exhaust-valve", no: "next", note: "Air out the exhaust pipe is a leaking exhaust valve. Air out the carburetor is a leaking intake valve; air out the timing inspection hole is rings, piston/cylinder, or head gasket.", cite: "FSM #99482-98 §3 p. 3-12" },
+        { q: "Leakdown test: is air escaping through the carburetor intake?", yes: "intake-valve", no: "next", note: "Air out the carburetor intake is a leaking intake valve. Check for correct pushrod length if air escapes through the valves.", cite: "FSM #99482-98 §3 p. 3-12" },
+        { q: "Leakdown test: is air escaping through the timing inspection hole?", yes: "rings-gasket", no: "next", note: "Air through the timing hole means leaking, worn, or broken piston rings, a worn piston and/or cylinder, or a leaking head gasket.", cite: "FSM #99482-98 §3 p. 3-12" },
+        { q: "Was the rev limiter removed, or has the engine been over-revved — a missed shift, or sustained running near 6,800 rpm?", yes: "over-rev", no: "next", note: "Over-revving on a missed shift can make the valve collars smack the seals and cause the bike to smoke. About 6,800 rpm is where wear climbs disproportionately. This cause is NOT in the FSM — it comes from Easyriders Tech Tips Vol. 3 only.", cite: "Easyriders Tech Tips Vol. 3, Carl Morrow FXRS hop-up (not an FSM cause)" },
+        { q: "With the suspect head off: are the valve guide seals damaged, or is stem-to-guide clearance excessive?", yes: "seals", no: "carryover", note: "Head-off inspect list: valve guide seals, guide-to-stem clearance, gasket surfaces, and head casting porosity letting oil drain into the chamber. Check oil carryover BEFORE removing the head.", cite: "FSM #99482-98 §3 p. 3-12" }
+      ],
+      causes: [
+        { cause: "Worn, broken, or stuck piston rings", weight: 25, test: "Compression low on first stroke, builds on following strokes but never reaches normal; improves considerably with oil added. Leakdown: air through the timing inspection hole.", fix: "Replace rings; inspect piston and cylinder for wear — if the cylinder is out of tolerance, bore/hone and fit oversize", urgency: "high", ride: "Do not ride until fixed — oil burning plus low compression.", source: "FSM #99482-98 §3 pp. 3-11–3-12 (diagnostic chart: Ring Trouble)" },
+        { cause: "Leaking intake valve", weight: 15, test: "Compression low on first stroke, does not build up much, does not improve considerably with oil. Leakdown: air escaping through the carburetor intake.", fix: "Grind valves and valve seats; check for correct pushrod length", urgency: "high", ride: "Do not ride until fixed — low compression.", source: "FSM #99482-98 §3 p. 3-12 (diagnostic chart: Valve Trouble)" },
+        { cause: "Leaking exhaust valve", weight: 15, test: "Same compression pattern as intake-valve trouble. Leakdown: air escaping through the exhaust pipe.", fix: "Grind valves and valve seats; check for correct pushrod length", urgency: "high", ride: "Do not ride until fixed — low compression.", source: "FSM #99482-98 §3 p. 3-12 (diagnostic chart: Valve Trouble)" },
+        { cause: "Blown head gasket", weight: 10, test: "Same compression reaction as valve trouble. Leakdown: air through the timing inspection hole; inspect gasket surfaces of head and cylinder with the head off.", fix: "Replace head gasket; check both gasket surfaces for flatness", urgency: "high", ride: "Do not ride until fixed.", source: "FSM #99482-98 §3 p. 3-12 (diagnostic chart: Head Gasket Leak)" },
+        { cause: "Valve guide seals damaged, or stem-to-guide clearance excessive", weight: 10, test: "Compression passes (90 psi, within 10%) but the engine still smokes; with the head off, inspect seals and measure stem-to-guide clearance.", fix: "Replace valve guide seals; replace guides/valves if clearance is excessive", urgency: "medium", ride: "Rideable if compression is good; fix soon — oil is getting past the seals.", source: "FSM #99482-98 §3 p. 3-12 (Diagnosing Smoking Engine inspect list)" },
+        { cause: "Over-rev damage — valve collars smacked the seals after rev-limiter removal", weight: 10, test: "Smoking started after a missed shift or sustained high revs with the limiter removed; compression may still pass.", fix: "Replace valve guide seals; inspect collars and guides; refit a rev limiter", urgency: "medium", ride: "Rideable if compression is good; fix soon — and keep the limiter.", source: "NOT an FSM cause — Easyriders Tech Tips Vol. 3, Carl Morrow FXRS hop-up (removing the limiter; over-rev on a missed shift; ~6,800 rpm wears the engine disproportionately)" },
+        { cause: "Oil overfill", weight: 5, test: "Oil level above the full mark on a level surface, engine warm.", fix: "Drain oil to the correct level", urgency: "low", ride: "Rideable once the level is corrected.", source: "FSM #99482-98 §3 p. 3-12 (Diagnosing Smoking Engine inspect list: Overfill)" },
+        { cause: "Oil carryover, clogged oil return passages, or head casting porosity", weight: 5, test: "Compression passes and seals look good; check oil carryover BEFORE head removal; with the head off, check return passages for clogging and the head casting for porosity letting oil drain into the chamber.", fix: "Clear clogged return passages; a porous head casting is a head replacement — shop job", urgency: "medium", ride: "Rideable if compression is good; fix soon.", source: "FSM #99482-98 §3 p. 3-12 (Diagnosing Smoking Engine inspect list)" },
+        { cause: "White smoke / steam after a cold start — normal condensation, not a fault", weight: 5, test: "White smoke or steam only right after first starting in cold weather; clears as the engine warms; no oil consumption.", fix: "No fix — this is condensed steam from combustion.", urgency: "low", ride: "Rideable.", source: "Sportster 86-03 p. 89; sportster-86-03-trouble p. 58 ('It is normal to see white smoke or steam from the exhaust after first starting the engine in cold weather')" }
+      ]
     }
   ],
-  /* Parts & prices — every price read from a live product page Nov 24, 2026
-     (39 J&P Cycles, 1 Dennis Kirk — the main jet; RevZilla never needed).
-     DIY cost is the part price. Shop cost is part + labor, and NO labor time
-     or shop rate was published on any page checked, so the app never invents
-     one — shop cost reads "part + ask your shop". Prices move; the app shows
-     "checked Nov 24, 2026" with a link out per record. `note` flags the
-     fitment surprises (year splits) and the two ambiguous prices (shocks
-     per-pair-or-each, main-jet family page). `pads` is its own key (the
-     atlas `disc` record is the rotor). `rubber-plug` has no standalone price
-     — it only ships inside rebuild kits, so it points at the kit. */
-  prices: {
-    "master-cyl": { name: "Front master cylinder assembly, 5/8 in. bore (Milwaukee Twins)", price: 189.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/milwaukee-twins-front-brake-master-cylinder-assembly", date: "2026-11-24", note: "Complete assembly, not a rebuild kit." },
-    "brake-line": { name: "Front brake line kit, stainless braided (Drag Specialties)", price: 57.70, source: "J&P Cycles", url: "https://www.jpcycles.com/product/drag-specialties-standard-length-front-brake-line-kit-for-harley-flstcfn-1987-1999", date: "2026-11-24" },
-    "caliper": { name: "Front caliper rebuild kit — piston + seals (Drag Specialties)", price: 33.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/drag-specialties-front-caliper-rebuild-piston-and-seals-kit-for-harley-1984-1999", date: "2026-11-24", note: "Rebuild kit, not a complete caliper." },
-    "disc": { name: "Front brake rotor, vented stainless (Milwaukee Twins)", price: 95.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/milwaukee-twins-steel-disc-brake-rotor-for-harley-1984-1999", date: "2026-11-24", note: "Per rotor." },
-    "pads": { name: "Front brake pads 44063-83C/D, organic (Milwaukee Twins)", price: 20.89, source: "J&P Cycles", url: "https://www.jpcycles.com/product/milwaukee-twins-organic-front-brake-pads-for-harley-1984-1999", date: "2026-11-24", note: "One set per disc." },
-    "dot5-fluid": { name: "DOT 5 silicone brake fluid, 500ml (Maxima)", price: 39.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/maxima-dot-5-silicone-brake-fluid", date: "2026-11-24", note: "DOT 5 only — never mix with DOT 3, DOT 4, or 5.1." },
-    "fork": { name: "Fork seal kit, 41mm (James Gasket)", price: 25.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/james-gasket-fork-seal-kit-for-harley-1984-2016?sku_id=984925", date: "2026-11-24", note: "Seal kit for both forks, not a full fork assembly." },
-    "front-axle": { name: "Front axle + hardware kit (V-Twin)", price: 56.40, source: "J&P Cycles", url: "https://www.jpcycles.com/product/v-twin-mfg-replacement-front-axle-hardware-kit-for-harley-fl-softail-1987-1995", date: "2026-11-24" },
-    "rear-axle": { name: "Rear axle kit, chrome (Drag Specialties)", price: 87.69, source: "J&P Cycles", url: "https://www.jpcycles.com/product/drag-specialties-chrome-rear-axle-kit-for-harley-softail-1986-1999?sku_id=1153461", date: "2026-11-24" },
-    "shocks": { name: "Adjustable shocks, Softail 1989-1999 (V-Twin)", price: 288.36, source: "J&P Cycles", url: "https://www.jpcycles.com/product/v-twin-mfg-adjustable-shocks-for-harley-softail-1989-1999", date: "2026-11-24", note: "The listing does not say whether this is per pair or per shock." },
-    "wheel-bearing": { name: "Wheel bearing + race 9052 (Timken)", price: 24.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/timken-wheel-bearing-and-race-for-harley-1973-1999", date: "2026-11-24", note: "Each — two bearings per wheel." },
-    "exhaust-gaskets": { name: "Tapered exhaust gasket (S&S)", price: 8.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/ss-tapered-exhaust-gasket-for-harley-1984-2021?rrec=true", date: "2026-11-24", note: "Each — two per bike." },
-    "slide": { name: "CV40 vacuum piston / slide + diaphragm (Milwaukee Twins)", price: 39.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/milwaukee-twins-cv-vacuum-piston-for-harley-1988-2006", date: "2026-11-24" },
-    "carb-body": { name: "CV40 rebuild kit, 13-piece (Cycle Pro)", price: 25.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/cycle-pro-deluxe-rebuild-kit-for-keihin-cv-for-harley-1990-2006", date: "2026-11-24", note: "A whole CV40 body is not sold alone — this rebuild kit is the buyable proxy. Contains the rubber plug." },
-    "float-bowl": { name: "CV carb rebuild kit, 13-piece (James Gasket)", price: 82.55, source: "J&P Cycles", url: "https://www.jpcycles.com/product/401-016/genuine-james-rebuild-kit-for-keihin-cv-carbs", date: "2026-11-24", note: "A float bowl alone is not sold — this kit is the buyable proxy." },
-    "rubber-plug": { see: "carb-body", note: "No standalone price — the plug only ships inside rebuild kits." },
-    "jackshaft": { see: "starter", note: "No standalone price verified in the Nov 25, 2026 library sweep — the jackshaft ships with the starter drive; no price invented." },
-    "enrichener": { name: "CV choke cable, 8 in. (Drag Specialties)", price: 26.45, source: "J&P Cycles", url: "https://www.jpcycles.com/product/drag-specialties-keihin-cv-choke-cable-for-harley-1988-2006", date: "2026-11-24", note: "Discontinued — the replacement cable is $23.99 and out of stock." },
-    "mixture-screw": { name: "Extended fuel mixture screw (All Balls Racing)", price: 14.02, source: "J&P Cycles", url: "https://www.jpcycles.com/product/all-balls-racing-extended-fuel-mixture-screw-for-harley-cv-carb-1990-2006", date: "2026-11-24" },
-    "accel-pump": { name: "CV accelerator pump upgrade kit (Cycle Pro)", price: 18.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/cycle-pro-cv-accelerator-pump-upgrade-for-harley-cv-carb-1990-2006", date: "2026-11-24", note: "Upgrade kit, not a diaphragm alone — the standalone diaphragm only ships inside rebuild kits." },
-    "main-jet": { name: "CV40 main jet, size 185 (Cycle Pro)", price: 6.26, source: "Dennis Kirk", url: "https://www.denniskirk.com/cycle-pro/main-jet-for-cv-type-keihin-carb.ph17217.prd/173477.sku", date: "2026-11-24", note: "Price from the family page; size 185 is a listed orderable size." },
-    "pilot-jet": { name: "CV40 pilot jet, size 45 (CV Performance)", price: 4.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/cv-performance-cv-style-carburetor-pilot-jet-for-harley-1988-2006", date: "2026-11-24" },
-    "float": { name: "CV carb float (V-Twin)", price: 18.64, source: "J&P Cycles", url: "https://www.jpcycles.com/product/v-twin-mfg-cv-carburetor-float-for-harley-1992-2006", date: "2026-11-24", note: "Fits 1992 and later — the 1995 Fat Boy only, not the 1990 Softail." },
-    "intake-seals": { name: "Intake manifold seal (James Gasket)", price: 4.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/james-gasket-intake-manifold-seal-for-harley-big-twin-sportster-1986-2022", date: "2026-11-24", note: "Each — two per bike." },
-    "primary-chain": { name: "Primary chain, 82 links (Twin Power)", price: 89.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/twin-power-primary-chain-for-harley-big-twin-1941-2006", date: "2026-11-24" },
-    "primary-shoe": { name: "Primary chain tensioner shoe (Milwaukee Twins)", price: 8.79, source: "J&P Cycles", url: "https://www.jpcycles.com/product/milwaukee-twins-primary-chain-tensioner-shoe-for-harley-big-twin-1965-2000", date: "2026-11-24" },
-    "clutch": { name: "Clutch kit — 8 Kevlar + 6 steel plates (Twin Power)", price: 256.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/twin-power-clutch-kit-for-harley-big-twin-sportster-1990-2021", date: "2026-11-24" },
-    "transmission": { name: "Transmission rebuild kit, 5-speed (Baker)", price: 429.00, source: "J&P Cycles", url: "https://www.jpcycles.com/product/baker-drivetrain-transmission-rebuild-kit-for-harley-big-twin-evo-1987-1993", date: "2026-11-24", note: "Covers 1987-1993 — the 1990 Softail only; the 1995 needs the 1994-1998 kit." },
-    "belt": { name: "Final drive belt, 130-tooth (S&S X7N)", price: 305.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/ss-cycle-x7n-high-strength-final-drive-belt-for-harley-fl-softail-1995-1999", date: "2026-11-24", note: "Fits 1995-1999 only — the 1990 Softail uses a 132-tooth belt." },
-    "heads": { name: "Cylinder head / base gasket kit (James Gasket)", price: 52.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/james-gasket-cylinder-headbase-gasket-kit-for-harley-evo-1984-1999", date: "2026-11-24", note: "Price shown on the page; the listing ranges $47.85-$78.95 by bore/gasket option." },
-    "valves": { name: "Adjustable chromoly pushrod set (S&S)", price: 152.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/ss-adjustable-chromoly-pushrods-for-harley-big-twin-1984-1999", date: "2026-11-24", note: "Pushrod set — the buyable proxy for valves + pushrods." },
-    "lifters": { name: "Hydraulic lifters, set of 4 (Feuling HP+)", price: 289.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/feuling-hp-hydraulic-lifters-for-harley-1984-1999", date: "2026-11-24" },
-    "crankcase": { name: "Complete engine gasket set (James Gasket)", price: 126.95, source: "J&P Cycles", url: "https://www.jpcycles.com/product/james-gasket-engine-gasket-set-for-harley-evo-1992-1999", date: "2026-11-24", note: "Covers 1992-1999 — the 1995 Fat Boy only; the 1990 needs the 1984-1991 kit." },
-    "battery": { name: "Battery — Yuasa YB16-B-CX, 12V 225 CCA", price: 116.96, source: "J&P Cycles", url: "https://www.jpcycles.com/product/yuasa-yb16-b-cx-yumicron-cx-battery", date: "2026-11-24", note: "Fits the 1990 Softail only — the 1995 Fat Boy takes the larger YTX20-size battery. Out of stock at time of check." },
-    "ignition-module": { name: "Ignition module — Dynatek Dyna 2000i (D2KI-1P)", price: 311.10, source: "J&P Cycles", url: "https://www.jpcycles.com/product/dynatek-2000i-ignition-kit-for-harley-1970-2000", date: "2026-11-24" },
-    "coil": { name: "Single-fire 3-ohm coil, chrome (Twin Power)", price: 114.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/twin-power-single-fire-3-ohm-ignition-coil-for-harley-1980-1999?sku_id=10066572", date: "2026-11-24", note: "Chrome finish; the black finish ($99.99) was out of stock." },
-    "plugs": { name: "Spark plugs, pair (Drag Specialties, replaces 5R6A)", price: 15.85, source: "J&P Cycles", url: "https://www.jpcycles.com/product/drag-specialties-performance-spark-plugs-for-harley-big-twin-1975-2000", date: "2026-11-24", note: "Price is per pair." },
-    "voes": { name: "VOES (Drag Specialties replacement)", price: 67.36, source: "J&P Cycles", url: "https://www.jpcycles.com/product/drag-specialties-replacement-vacuum-operated-electrical-switch", date: "2026-11-24" },
-    "stator": { name: "Stator, 32-amp (Drag Specialties, replaces 29970-88)", price: 93.04, source: "J&P Cycles", url: "https://www.jpcycles.com/product/drag-specialties-stator-for-harley-evo-1988-1999", date: "2026-11-24" },
-    "regulator": { name: "Regulator, 32-amp, black (Milwaukee Twins, replaces 74519-88)", price: 72.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/milwaukee-twins-regulator-for-harley-evo-1989-1999", date: "2026-11-24" },
-    "plug-wires": { name: "Spark plug wire set (Hot Fire, 1980-1999)", price: 58.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/hot-fire-spark-plug-wire-set-for-harley-1980-1999", date: "2026-11-24" },
-    "starter": { name: "Starter motor, 1.4kW, black (All Balls Racing)", price: 389.99, source: "J&P Cycles", url: "https://www.jpcycles.com/product/all-balls-racing-high-performance-14kw-starter-for-harley-big-twin-1990-2006", date: "2026-11-24" }
-  },
+  /* Parts & prices — moved to the shared Pocket Garage parts core
+     (pg-parts-core.js, vendored verbatim; canonical copy at
+     ~/workspace/github-buildout/pg-parts-core.js). Every price is read
+     from the module via PG_PartsCore.getPrice(key) — the atlas `part`
+     keys below are already the shared keys, so no cause text changed.
+     DIY cost is the part price; shop cost stays "part + ask your shop"
+     — no labor rate exists anywhere. `see` pointers are returned as-is
+     by the module and never silently followed. */
+
   sound_hints: [
     { sound: "Lifter tick", rate: "half engine speed", test: "Check lifter bleed-down and oil", urgency: "low" },
     { sound: "Rod knock", rate: "once per revolution, worse under load", test: "Oil-pressure check FIRST", urgency: "critical" },
@@ -779,167 +787,467 @@ const ED_DATA = {
     { sound: "Exhaust leak", bike: "2013 Road Glide Ultra (Twin Cam 103)", claim: "Ticking after a 2-into-1 pipe swap", url: "https://youtu.be/65RXE9BWhRM", caveat: "Never resolved — exhaust leak vs lifter vs cam-chain tensioners." },
     { sound: "Valve train noise, explained", bike: "Twin Cam / M8", claim: "Star Racing — why your Harley has excessive valve train noise", url: "https://www.youtube.com/watch?v=AeN16l47Ci4", caveat: "A teaching video, not a fault sample." }
   ],
-  /* Torque & specs — FSM #99482-98 §2 (pp. 2-1 to 2-3) plus the chapter torque
-     tables, all read visually from the rendered pages Nov 24, 2026: §3 p. 3-2
-     (engine), §4 p. 4-1 (carburetor), §5 p. 5-1 (starter), §6 p. 6-1 (clutch &
-     primary), §8 p. 8-1 (electrical & charging). Factory values only, never
-     guessed. The generic bolt-size table (FSM §1, p. 1-10) is not included —
-     the specific tables govern. Torque sequences (FSM §3 pp. 3-21–3-22 head
-     bolts, p. 3-66 crankcase) were verified from the rendered pages
-     Nov 24–25, 2026 and live in torque.sequences. */
+  /* Torque & specs — FSM values live in the shared parts core
+     (pg-parts-core.js). data.js keeps only the Torque tab's index:
+     the §2 table id + ordered slug list (sec2), one entry per chapter
+     table (id + display title/ref + ordered slugs), and the sequence
+     ids. app.js resolves every row through PG_PartsCore.getTorque
+     (table id + slug — never a bare fastener name; the Sportster and
+     Softail clutch-cover values differ) and every sequence through
+     getTorqueSequence. This index is generated from the vendored
+     module — do not hand-edit slugs; re-run the generator in the
+     wiring handoff if the module changes. The Sportster Clymer
+     chapter stays local: it is NOT in pg-parts-core v1 (the module
+     seed covers the FSM tables + the factory Sportster table only),
+     and its rows mix torque with clearances, idle speeds and timing.
+     capacities / tire_pressures / dimensions stay local per the
+     parts-core spec §4 — they are specs, not torque. */
   torque: {
-    source: "Harley-Davidson Softail 1997-1998 Service Manual 99482-98. Section 2 (Specifications), pp. 2-1 to 2-3; chapter torque tables: §3 p. 3-2, §4 p. 4-1, §5 p. 5-1, §6 p. 6-1, §8 p. 8-1; torque sequences: §3 pp. 3-21–3-22 (head bolts, Figs. 3-16/3-17) and p. 3-66 (crankcase, Fig. 3-88); turn direction and per-head structure from the 1984–1999 Repair Manual step 6B. Covers FXSTC, FXSTS, FXSTSB, FLSTC, FLSTF, FLSTS.",
-    rows: [
-      { fastener: "Slider cap nuts (FLSTC, FLSTF, FXSTC)", value: "9-13 ft-lbs (12-18 Nm)" },
-      { fastener: "Front axle nut (FXSTC, FLSTC, FLSTF)", value: "45-50 ft-lbs (61-68 Nm)" },
-      { fastener: "Front axle nut (FXSTS, FXSTSB, FLSTS)", value: "60-65 ft-lbs (81-88 Nm)" },
-      { fastener: "Rear axle nut", value: "60-65 ft-lbs (81-88 Nm)" },
-      { fastener: "Brake disc screws, rear", value: "30-45 ft-lbs (41-61 Nm)" },
-      { fastener: "Brake disc screws, front", value: "16-24 ft-lbs (22-33 Nm)" },
-      { fastener: "Brake bleeder valve", value: "80-100 in-lbs (9-11.3 Nm)" },
-      { fastener: "Brake pad retainer screw", value: "40-50 in-lbs (4.5-5.6 Nm)" },
-      { fastener: "Rear wheel sprocket mounting bolts", value: "55-65 ft-lbs (74.6-88.1 Nm)" },
-      { fastener: "Rear brake caliper (mounting) pin bolts", value: "15-20 ft-lbs (20-27 Nm)" },
-      { fastener: "Rear fender supports", value: "30-33 ft-lbs (41-45 Nm)" },
-      { fastener: "Rear shock absorber mounting bolts", value: "115-130 ft-lbs (156-176 Nm)" },
-      { fastener: "Front brake bracket to fender bracket mounting bolt (FXSTS, FXSTSB, FLSTS)", value: "10-20 ft-lbs (14-27 Nm)" },
-      { fastener: "Front brake caliper mounting bolts, FXSTC/FLSTC/FLSTF (upper)", value: "25-30 ft-lbs (34-41 Nm)" },
-      { fastener: "Front brake caliper mounting bolts, FXSTS/FXSTSB/FLSTS (upper), 1997 models (12 pt. bolt)", value: "42-46 ft-lbs (57-62 Nm)" },
-      { fastener: "Front brake caliper mounting bolts, FXSTS/FXSTSB/FLSTS (upper), 1998 models (socket head bolt)", value: "28-30 ft-lbs (38-41 Nm)" },
-      { fastener: "Front brake caliper mounting bolts, FXSTS/FXSTSB/FLSTS (lower)", value: "25-30 ft-lbs (34-41 Nm)" },
-      { fastener: "Brake banjo bolts", value: "17-22 ft-lbs (23-30 Nm)" }
-    ],
-    chapters: [
-      { title: "Engine", ref: "FSM §3, p. 3-2", rows: [
-        { fastener: "Crank pin nut", value: "180-210 ft-lbs (244-285 Nm)" },
-        { fastener: "Pinion gear nut", value: "35-45 ft-lbs (47-61 Nm)" },
-        { fastener: "Oil pump cover bolts", value: "90-120 in-lbs (10.2-13.6 Nm)" },
-        { fastener: "Hydraulic lifter guide bolts", value: "9-12 ft-lbs (12-16 Nm)" },
-        { fastener: "Hydraulic lifter screen plug", value: "90-120 in-lbs (10.2-13.6 Nm)" },
-        { fastener: "Rocker cover screws — Part No. 4718A", value: "90-120 in-lbs (10-13 Nm)" },
-        { fastener: "Rocker cover screws — Part Nos. 3997/882", value: "10-14 ft-lbs (14-19 Nm)" },
-        { fastener: "Rocker cover screws — Part Nos. 3501/3500", value: "15-19 ft-lbs (20-26 Nm)" },
-        { fastener: "Cylinder head bolts", value: "See Cylinder Head Torque Sequence below (FSM §3)" },
-        { fastener: "Upper engine mounting bracket — to cylinder heads", value: "28-35 ft-lbs (38-48 Nm)" },
-        { fastener: "Upper engine mounting bracket — to frame", value: "28-32 ft-lbs (38-43 Nm)" },
-        { fastener: "Crankcase stud nut", value: "See Crankcase Torque Sequence below (FSM §3)" },
-        { fastener: "Crankcase bolt", value: "See Crankcase Torque Sequence below (FSM §3)" },
-        { fastener: "Gearcase cover screws", value: "90-120 in-lbs (10.2-13.6 Nm)" },
-        { fastener: "Timer screws (inner cover and sensor plate)", value: "15-30 in-lbs (1.7-3.4 Nm)" },
-        { fastener: "Spark plug", value: "18-22 ft-lbs (24-30 Nm)" }
-      ] },
-      { title: "Carburetor", ref: "FSM §4, p. 4-1", rows: [
-        { fastener: "Manifold mounting capscrews", value: "15-17 ft-lbs (20-23 Nm)" },
-        { fastener: "Backplate-to-cylinder head screws", value: "10-12 ft-lbs (14-16 Nm)" },
-        { fastener: "Backplate-to-carburetor screws", value: "3-5 ft-lbs (4-7 Nm)" },
-        { fastener: "Air cleaner cover screw", value: "3-5 ft-lbs (4-7 Nm)" }
-      ] },
-      { title: "Starter", ref: "FSM §5, p. 5-1", rows: [
-        { fastener: "Thru-bolts", value: "39-65 in-lbs (4.4-7.3 Nm)" },
-        { fastener: "End cover mounting bracket", value: "50-60 in-lbs (5.6-6.8 Nm)" },
-        { fastener: "End cover center screw", value: "90-110 in-lbs (10.2-12.4 Nm)" },
-        { fastener: "Cable terminal nuts", value: "65-80 in-lbs (7.3-9.0 Nm)" },
-        { fastener: "Starter mounting bolts", value: "13-20 ft-lbs (18-27 Nm)" },
-        { fastener: "Jackshaft bolt", value: "7-9 ft-lbs (9-12 Nm)" }
-      ] },
-      { title: "Clutch & primary", ref: "FSM §6, p. 6-1", rows: [
-        { fastener: "Primary cover screws", value: "108-120 in-lbs (12-13.5 Nm)" },
-        { fastener: "Primary chain inspection cover screws", value: "50-70 in-lbs (5.6-7.9 Nm)" },
-        { fastener: "Clutch inspection cover screws", value: "50-70 in-lbs (5.6-7.9 Nm)" },
-        { fastener: "Compensating sprocket nut", value: "150-165 ft-lbs (203-224 Nm)" },
-        { fastener: "Transmission sprocket nut", value: "50 ft-lbs (67.8 Nm) initial torque, then turn another 30°-45°" },
-        { fastener: "Transmission sprocket locking screw", value: "7-9 ft-lbs (9-12 Nm)" },
-        { fastener: "Clutch hub nut (left hand threads)", value: "70-80 ft-lbs (95-108 Nm)" },
-        { fastener: "Clutch adjusting screw jamnut", value: "6-10 ft-lbs (8-14 Nm)" }
-      ] },
-      { title: "Electrical & charging", ref: "FSM §8, p. 8-1", rows: [
-        { fastener: "Neutral switch (1997 models)", value: "3-5 ft-lbs (4-7 Nm)" },
-        { fastener: "Neutral switch (1998 models)", value: "10-15 ft-lbs (13.6-20.3 Nm)" },
-        { fastener: "Sensor plate screws", value: "15-30 in-lbs (1.7-3.4 Nm)" },
-        { fastener: "Inner timer cover screws", value: "12-20 in-lbs (1.4-2.3 Nm)" },
-        { fastener: "Rotor bolt", value: "75-80 in-lbs (8.5-9.0 Nm)" },
-        { fastener: "Alternator stator Torx screws", value: "30-40 in-lbs (3.5-4.5 Nm)" },
-        { fastener: "Alternator sprocket nut", value: "150-165 ft-lbs (203-224 Nm)" },
-        { fastener: "Battery terminal bolts", value: "40 in-lbs (4.5 Nm)" },
-        { fastener: "Headlamp adjustment screws (FXSTS, FXSTSB, FLSTS)", value: "30 ft-lbs (41 Nm)" },
-        { fastener: "Passing lamp & bracket nuts (FLSTC)", value: "18 ft-lbs (24 Nm)" },
-        { fastener: "Turn signal module bolt", value: "10 in-lbs (1.1 Nm)" },
-        { fastener: "Horn cover screws (FLSTS)", value: "23-28 in-lbs (2.6-3.1 Nm)" },
-        { fastener: "Horn nut (all except FLSTS)", value: "110 in-lbs (12.4 Nm)" },
-        { fastener: "Speed sensor mounting screw", value: "7-9 ft-lbs (9.5-12 Nm)" },
-        { fastener: "Handlebar clamp — master cylinder Torx screws", value: "60-80 in-lbs (6.8-9.0 Nm)" },
-        { fastener: "Upper and lower switch housing Torx screws", value: "35-45 in-lbs (3.9-5.1 Nm)" },
-        { fastener: "Handlebar clamp — clutch lever bracket Torx screws", value: "60-80 in-lbs (6.8-9.0 Nm)" }
-      ] },
-      { title: "Sportster (1986–2003)", ref: "Sportster 1986–2003 Service Manual (sportster-86-03). These are Sportster values, NOT corrections to the Softail tables above — same fastener, different bike. Use only on 1986–2003 Sportsters.", rows: [
-        { fastener: "Clutch inspection cover screws", value: "84–108 in-lbs (9.5–12.2 Nm) — conflicts with Softail FSM §6 50–70 in-lbs" },
-        { fastener: "Spark plug", value: "11–18 ft-lbs (15–24 Nm) — Softail FSM §3 says 18–22 ft-lbs" }
-      ] }
-    ],
-    /* Torque sequences — verified from the rendered FSM pages Nov 24–25,
-       2026 (full write-up: ~/workspace/research_notes/torque-sequences-figures.md).
-       Head: mirrored numbering between heads, three passes per head, repeat on
-       the other head (Repair Manual 6B). Crankcase: 8 positions criss-cross,
-       two passes with cylinders/heads installed between them. The FSM misprints
-       the crankcase second pass as "(20–35 Nm)" — the real conversion is
-       20–23 Nm, flagged in the note, never used as a value. */
-    sequences: [
+    "source": "Harley-Davidson Softail 1997-1998 Service Manual 99482-98. Section 2 (Specifications), pp. 2-1 to 2-3; chapter torque tables: §3 p. 3-2, §4 p. 4-1, §5 p. 5-1, §6 p. 6-1, §8 p. 8-1; torque sequences: §3 pp. 3-21–3-22 (head bolts, Figs. 3-16/3-17) and p. 3-66 (crankcase, Fig. 3-88); turn direction and per-head structure from the 1984–1999 Repair Manual step 6B. Covers FXSTC, FXSTS, FXSTSB, FLSTC, FLSTF, FLSTS.",
+    "sec2": {
+      "id": "fsm-99482-98-sec2",
+      "slugs": [
+        "slider-cap-nuts-flstc-flstf-fxstc",
+        "front-axle-nut-fxstc-flstc-flstf",
+        "front-axle-nut-fxsts-fxstsb-flsts",
+        "rear-axle-nut",
+        "brake-disc-screws-rear",
+        "brake-disc-screws-front",
+        "brake-bleeder-valve",
+        "brake-pad-retainer-screw",
+        "rear-wheel-sprocket-mounting-bolts",
+        "rear-brake-caliper-mounting-pin-bolts",
+        "rear-fender-supports",
+        "rear-shock-absorber-mounting-bolts",
+        "front-brake-bracket-to-fender-bracket-mounting-bolt-fxsts-fxstsb-flsts",
+        "front-brake-caliper-mounting-bolts-fxstc-flstc-flstf-upper",
+        "front-brake-caliper-mounting-bolts-fxsts-fxstsb-flsts-upper-1997-models-12-pt-bolt",
+        "front-brake-caliper-mounting-bolts-fxsts-fxstsb-flsts-upper-1998-models-socket-head-bolt",
+        "front-brake-caliper-mounting-bolts-fxsts-fxstsb-flsts-lower",
+        "brake-banjo-bolts"
+      ]
+    },
+    "chapters": [
       {
-        id: "head-bolts",
-        title: "Cylinder head bolts",
-        ref: "FSM #99482-98 §3, pp. 3-21–3-22 (Figs. 3-16, 3-17)",
-        figure: "Front head: 1 top-left, 3 top-right, 2 bottom-left, 4 bottom-right. Rear head mirrored: 2 top-left, 4 top-right, 1 bottom-left, 3 bottom-right. The 1-2-3-4 order runs one side's pair first, then the other.",
-        caution: "Extremely critical — prevents gasket leaks, stud failure, and head and cylinder distortion.",
-        prep: [
-          "New O-rings over the cylinder dowels before the head gasket.",
-          "Clean and lubricate bolt threads with engine oil; screw the bolts onto the studs to check for friction — dirt makes torque readings lie.",
-          "Dip the bottom face of bolts in oil, wipe off excess; install finger tight.",
-          "Hardened fasteners only — never substitute unhardened parts; do not reuse fiber cover seals."
-        ],
-        passes: [
-          { value: "7–9 ft-lbs (9–12 Nm)", order: "1, 2, 3, 4" },
-          { value: "12–14 ft-lbs (16–19 Nm)", order: "1, 2, 3, 4" },
-          { value: "One quarter-turn (90°) clockwise, one bolt at a time", order: "1, 2, 3, 4", note: "Mark a line on the head and a matching line on each bolt head first (Fig. 3-17); finished when all marks sit as in View B" }
-        ],
-        repeat: "Repeat the whole procedure on the other head.",
-        note: "FSM step 2 reads 'on the other cylinder'; the 1984–1999 Repair Manual step 6B (same values) makes clear both passes are done per head, then repeated on the opposite head. Turn direction (clockwise) is from Repair Manual 6B.d, consistent with FSM Fig. 3-17."
+        "id": "fsm-99482-98-ch3",
+        "title": "Engine",
+        "ref": "FSM §3, p. 3-2",
+        "slugs": [
+          "crank-pin-nut",
+          "pinion-gear-nut",
+          "oil-pump-cover-bolts",
+          "hydraulic-lifter-guide-bolts",
+          "hydraulic-lifter-screen-plug",
+          "rocker-cover-screws-part-no-4718a",
+          "rocker-cover-screws-part-nos-3997-882",
+          "rocker-cover-screws-part-nos-3501-3500",
+          "cylinder-head-bolts",
+          "upper-engine-mounting-bracket-to-cylinder-heads",
+          "upper-engine-mounting-bracket-to-frame",
+          "crankcase-stud-nut",
+          "crankcase-bolt",
+          "gearcase-cover-screws",
+          "timer-screws-inner-cover-and-sensor-plate",
+          "spark-plug"
+        ]
       },
       {
-        id: "crankcase",
-        title: "Crankcase fasteners",
-        ref: "FSM #99482-98 §3, p. 3-66 (Fig. 3-88)",
-        figure: "8 positions, criss-cross: 1 bottom-right of the flywheel cavity, 2 top-center between the cylinders, 3 bottom-left of the cavity, 4 upper-right edge, 5 mid-left edge, 6 far-right edge, 7 upper-left edge, 8 lower-right edge. Never two adjacent positions in a row.",
-        caution: "Follow the procedure — crankcase longevity may be compromised otherwise.",
-        prep: [
-          "Three alignment studs first — they align the case halves and go in before the remaining studs.",
-          "Non-hardening sealer (HD-99650-81 or 3M #800) on the mating surfaces.",
-          "Start nuts and tighten until snug, then torque in sequence."
-        ],
-        passes: [
-          { value: "10 ft-lbs (14 Nm)", order: "1 through 8, starting with #1", note: "Cases empty" },
-          { value: "15–17 ft-lbs (20–23 Nm)", order: "1 through 8, same sequence", note: "After cylinders and heads are installed" }
-        ],
-        note: "The FSM prints '(20–35 Nm)' for the second pass — a misprint in the book. 15–17 ft-lbs converts to 20–23 Nm. Never use 35 Nm."
+        "id": "fsm-99482-98-ch4",
+        "title": "Carburetor",
+        "ref": "FSM §4, p. 4-1",
+        "slugs": [
+          "manifold-mounting-capscrews",
+          "backplate-to-cylinder-head-screws",
+          "backplate-to-carburetor-screws",
+          "air-cleaner-cover-screw"
+        ]
+      },
+      {
+        "id": "fsm-99482-98-ch5",
+        "title": "Starter",
+        "ref": "FSM §5, p. 5-1",
+        "slugs": [
+          "thru-bolts",
+          "end-cover-mounting-bracket",
+          "end-cover-center-screw",
+          "cable-terminal-nuts",
+          "starter-mounting-bolts",
+          "jackshaft-bolt"
+        ]
+      },
+      {
+        "id": "fsm-99482-98-ch6",
+        "title": "Clutch & primary",
+        "ref": "FSM §6, p. 6-1",
+        "slugs": [
+          "primary-cover-screws",
+          "primary-chain-inspection-cover-screws",
+          "clutch-inspection-cover-screws",
+          "compensating-sprocket-nut",
+          "transmission-sprocket-nut",
+          "transmission-sprocket-locking-screw",
+          "clutch-hub-nut-left-hand-threads",
+          "clutch-adjusting-screw-jamnut"
+        ]
+      },
+      {
+        "id": "fsm-99482-98-ch8",
+        "title": "Electrical & charging",
+        "ref": "FSM §8, p. 8-1",
+        "slugs": [
+          "neutral-switch-1997-models",
+          "neutral-switch-1998-models",
+          "sensor-plate-screws",
+          "inner-timer-cover-screws",
+          "rotor-bolt",
+          "alternator-stator-torx-screws",
+          "alternator-sprocket-nut",
+          "battery-terminal-bolts",
+          "headlamp-adjustment-screws-fxsts-fxstsb-flsts",
+          "passing-lamp-bracket-nuts-flstc",
+          "turn-signal-module-bolt",
+          "horn-cover-screws-flsts",
+          "horn-nut-all-except-flsts",
+          "speed-sensor-mounting-screw",
+          "handlebar-clamp-master-cylinder-torx-screws",
+          "upper-and-lower-switch-housing-torx-screws",
+          "handlebar-clamp-clutch-lever-bracket-torx-screws"
+        ]
+      },
+      {
+        "id": "sportster-86-03",
+        "title": "Sportster (1986–2003)",
+        "ref": "Sportster 1986–2003 Service Manual (sportster-86-03). These are Sportster values, NOT corrections to the Softail tables above — same fastener, different bike. Use only on 1986–2003 Sportsters.",
+        "slugs": [
+          "clutch-inspection-cover-screws",
+          "spark-plug"
+        ]
       }
     ],
-    capacities: {
-      all: "Oil tank 3.0 qt (with filter) · Transmission 24 oz · Primary chaincase 32 oz (1997) / 26 oz (1998)",
-      flstc: "Fuel tank 4.2 gal (0.4 reserve) · Front fork 11.5 oz each (wet, except Springers) — FLSTC / FLSTF / FLSTS / FXSTS / FXSTSB",
-      fxstc: "Fuel tank 5.2 gal (0.6 reserve) · Front fork 10.2 oz each (wet) — FXSTC",
-      sportster: "Sportster transmission / primary: 24 oz (1986–1992) · 32 oz (1993–2003) (sportster-86-03)"
+    "sequences": [
+      "head-bolts",
+      "crankcase"
+    ],
+    "clymer": {
+      "title": "Sportster — Clymer tables (1986–2003)",
+      "ref": "Clymer Sportster 1986–2003, Ch. 3 Tables 7–9 (p. 150), read visually. AFTERMARKET — every value Clymer, never factory. Sportster values, NOT corrections to the Softail tables above or to the factory Sportster chapter. Use only on 1986–2003 Sportsters.",
+      "rows": [
+        {
+          "fastener": "Brake pad minimum thickness (Clymer Table 7)",
+          "value": "0.062 in (1.59 mm)"
+        },
+        {
+          "fastener": "Clutch cable free play (Clymer Table 7)",
+          "value": "1/16–1/8 in (1.6–3.2 mm)"
+        },
+        {
+          "fastener": "Drive belt deflection, 1991–1999 (Clymer Table 7)",
+          "value": "9/16–11/16 in (14.3–17.5 mm)"
+        },
+        {
+          "fastener": "Drive belt deflection, 2000–2003, 883/1200/1200S (Clymer Table 7)",
+          "value": "5/16–3/8 in (7.9–9.6 mm)"
+        },
+        {
+          "fastener": "Drive belt deflection, 2000–2003, 883H and 883C (Clymer Table 7)",
+          "value": "1/4–5/16 in (6.4–7.9 mm)"
+        },
+        {
+          "fastener": "Drive chain (Clymer Table 7)",
+          "value": "No. 530 (3/8 in wide) x 110 links"
+        },
+        {
+          "fastener": "Drive chain free play (Clymer Table 7)",
+          "value": "1/4 in (6.4 mm)"
+        },
+        {
+          "fastener": "Engine compression, minimum (Clymer Table 7)",
+          "value": "120 psi (828 kPa)"
+        },
+        {
+          "fastener": "Idle speed, 1986–1987 slow idle (Clymer Table 7)",
+          "value": "900–950 rpm"
+        },
+        {
+          "fastener": "Idle speed, 1986–1987 fast idle (Clymer Table 7)",
+          "value": "1500–1500 rpm (as printed) — Book prints 1500–1500; likely a misprint, unverified"
+        },
+        {
+          "fastener": "Idle speed, 1988–2003 (Clymer Table 7)",
+          "value": "1000–1050 rpm"
+        },
+        {
+          "fastener": "Primary chain free play, cold engine (Clymer Table 7)",
+          "value": "3/8–1/2 in (9.6–12.7 mm)"
+        },
+        {
+          "fastener": "Primary chain free play, hot engine (Clymer Table 7)",
+          "value": "1/4–3/8 in (6.4–9.6 mm)"
+        },
+        {
+          "fastener": "Spark plugs (Clymer Table 7)",
+          "value": "HD-6R12, gap 0.038–0.043 in (0.97–1.09 mm)"
+        },
+        {
+          "fastener": "Tire wear / maximum tread depth (Clymer Table 7)",
+          "value": "1/16 in (1.6 mm)"
+        },
+        {
+          "fastener": "Ignition timing, 1986–1994, fast idle 1650–1750 rpm (Clymer Table 8)",
+          "value": "VOES connected: 40° BTDC · VOES disconnected: Approx. 16° BTDC"
+        },
+        {
+          "fastener": "Ignition timing, 1986–1994, normal 950–1050 rpm (Clymer Table 8)",
+          "value": "VOES connected: 30° BTDC · VOES disconnected: Approx. 7.5° BTDC"
+        },
+        {
+          "fastener": "Ignition timing, 1995 U.S., 1650–1950 rpm (Clymer Table 8)",
+          "value": "VOES connected: 35° BTDC · VOES disconnected: Approx. 16° BTDC"
+        },
+        {
+          "fastener": "Ignition timing, 1995 HDI, 1000–1050 rpm (Clymer Table 8)",
+          "value": "VOES connected: 20° BTDC · VOES disconnected: Approx. 7.5° BTDC"
+        },
+        {
+          "fastener": "Ignition timing, 1996–2003 (except 1998–2003 1200S), 1000–1050 rpm (Clymer Table 8)",
+          "value": "VOES connected: 20° BTDC · VOES disconnected: Approx. 7.5° BTDC"
+        },
+        {
+          "fastener": "Ignition timing, 1998–2000 1200S, 1000–1050 rpm (no VOES) (Clymer Table 8)",
+          "value": "VOES connected: 20° BTDC · VOES disconnected: —"
+        },
+        {
+          "fastener": "Ignition timing, 2001–2003 1200S, 1000–1050 rpm (no VOES) (Clymer Table 8)",
+          "value": "VOES connected: 15° BTDC · VOES disconnected: —"
+        },
+        {
+          "fastener": "Air filter cover (Clymer Table 9)",
+          "value": "36–60 in-lbs (4–7 Nm)"
+        },
+        {
+          "fastener": "Front fork cap, 1200S only (Clymer Table 9)",
+          "value": "11–22 ft-lbs (15–30 Nm)"
+        },
+        {
+          "fastener": "Primary chain adjuster locknut, 1986–1990 (Clymer Table 9)",
+          "value": "98–144 in-lbs (11–16 Nm)"
+        },
+        {
+          "fastener": "Primary chain adjuster locknut, 1991–2003 (Clymer Table 9)",
+          "value": "20–25 ft-lbs (27–34 Nm)"
+        },
+        {
+          "fastener": "Primary drive inspection cover retaining screws (Clymer Table 9)",
+          "value": "84–108 in-lbs (10–12 Nm)"
+        },
+        {
+          "fastener": "Rear axle nut (Clymer Table 9)",
+          "value": "60–65 ft-lbs (81–88 Nm)"
+        },
+        {
+          "fastener": "Transmission / primary chaincase drain plug (Clymer Table 9)",
+          "value": "14–21 ft-lbs (19–28 Nm)"
+        }
+      ]
     },
-    tire_pressures: {
-      flstc: "FLSTC / FLSTF / FLSTS — solo 36 front / 36 rear · rider + passenger 36 / 40",
-      fxstc: "FXSTC / FXSTS / FXSTSB — solo 30 front / 36 rear · rider + passenger 30 / 40",
-      note: "Dunlop only, cold. Never exceed the maximum pressure on the tire sidewall."
+    "capacities": {
+      "all": "Oil tank 3.0 qt (with filter) · Transmission 24 oz · Primary chaincase 32 oz (1997) / 26 oz (1998)",
+      "flstc": "Fuel tank 4.2 gal (0.4 reserve) · Front fork 11.5 oz each (wet, except Springers) — FLSTC / FLSTF / FLSTS / FXSTS / FXSTSB",
+      "fxstc": "Fuel tank 5.2 gal (0.6 reserve) · Front fork 10.2 oz each (wet) — FXSTC",
+      "sportster": "Sportster transmission / primary: 24 oz (1986–1992) · 32 oz (1993–2003) (sportster-86-03)"
     },
-    dimensions: [
-      { model: "FLSTC", length: "94.0 in", wheelbase: "63.9 in", saddle: "26.5 in", height: "59.4 in", dry: "704 lb", gvwr: "1,118 lb" },
-      { model: "FLSTF", length: "93.9 in", wheelbase: "63.9 in", saddle: "26.5 in", height: "48.0 in", dry: "631 lb", gvwr: "1,118 lb" },
-      { model: "FLSTS", length: "94.0 in", wheelbase: "63.1 in", saddle: "25.8 in", height: "44.0 in", dry: "690 lb", gvwr: "1,135 lb" },
-      { model: "FXSTC", length: "94.92 in", wheelbase: "66.5 in", saddle: "26.7 in", height: "47.0 in", dry: "613 lb", gvwr: "1,084 lb" },
-      { model: "FXSTS", length: "92.5 in", wheelbase: "64.4 in", saddle: "26.1 in", height: "47.0 in", dry: "625 lb", gvwr: "1,084 lb" },
-      { model: "FXSTSB", length: "92.5 in", wheelbase: "64.4 in", saddle: "25.7 in", height: "47.0 in", dry: "620 lb", gvwr: "1,084 lb" }
+    "tire_pressures": {
+      "flstc": "FLSTC / FLSTF / FLSTS — solo 36 front / 36 rear · rider + passenger 36 / 40",
+      "fxstc": "FXSTC / FXSTS / FXSTSB — solo 30 front / 36 rear · rider + passenger 30 / 40",
+      "note": "Dunlop only, cold. Never exceed the maximum pressure on the tire sidewall."
+    },
+    "dimensions": [
+      {
+        "model": "FLSTC",
+        "length": "94.0 in",
+        "wheelbase": "63.9 in",
+        "saddle": "26.5 in",
+        "height": "59.4 in",
+        "dry": "704 lb",
+        "gvwr": "1,118 lb"
+      },
+      {
+        "model": "FLSTF",
+        "length": "93.9 in",
+        "wheelbase": "63.9 in",
+        "saddle": "26.5 in",
+        "height": "48.0 in",
+        "dry": "631 lb",
+        "gvwr": "1,118 lb"
+      },
+      {
+        "model": "FLSTS",
+        "length": "94.0 in",
+        "wheelbase": "63.1 in",
+        "saddle": "25.8 in",
+        "height": "44.0 in",
+        "dry": "690 lb",
+        "gvwr": "1,135 lb"
+      },
+      {
+        "model": "FXSTC",
+        "length": "94.92 in",
+        "wheelbase": "66.5 in",
+        "saddle": "26.7 in",
+        "height": "47.0 in",
+        "dry": "613 lb",
+        "gvwr": "1,084 lb"
+      },
+      {
+        "model": "FXSTS",
+        "length": "92.5 in",
+        "wheelbase": "64.4 in",
+        "saddle": "26.1 in",
+        "height": "47.0 in",
+        "dry": "625 lb",
+        "gvwr": "1,084 lb"
+      },
+      {
+        "model": "FXSTSB",
+        "length": "92.5 in",
+        "wheelbase": "64.4 in",
+        "saddle": "25.7 in",
+        "height": "47.0 in",
+        "dry": "620 lb",
+        "gvwr": "1,084 lb"
+      }
+    ]
+  },
+  /* "Before you start" safety block (batch 2, Nov 25, 2026). One consistent
+     block, rendered at the top of every guided hands-on card (battery &
+     charging, compression test, sag setter). Generic shop safety — NOT a
+     manual procedure — except the battery items, which are FSM #99482-98
+     §8 warnings (acid, eye protection, charger clamps). The compression
+     test needs a WARM engine, so the cool-engine item names its own
+     exception rather than contradicting the card it sits on. */
+  safety_block: {
+    title: "Before you start",
+    note: "Generic shop safety — not a manual procedure. The battery items are FSM #99482-98 §8 warnings.",
+    items: [
+      "Ignition OFF before you touch plugs, wires, or the battery.",
+      "Work on a cool engine — unless the card says warm (the compression test needs a warm engine).",
+      "Eye protection on near the battery — batteries hold sulfuric acid.",
+      "No sparks or open flame near fuel or the battery.",
+      "Bike in neutral, on a stable stand, wheels chocked."
+    ]
+  },
+  /* Sportster CV jetting / tire pressures / fork oil (batch 2, Nov 25, 2026).
+     Clymer Sportster 1986–2003, read visually off the page renders (the FTS
+     OCR text scrambles table columns). AFTERMARKET — every value labeled
+     Clymer, never factory, never presented as a correction to Softail
+     values. Flag every value as Sportster. CV40 carburetor jet sizes;
+     1200S has its own main jet in 1998–2003 rows. */
+  sportster_cv_jetting: {
+    source: "Clymer Sportster 1986–2003, Ch. 11 Table 1 (p. 390), read visually",
+    note: "CV40 carburetor jet sizes. 1200S has its own main jet in 1998–2003 rows.",
+    usExceptCalifornia: {
+      label: "U.S. except California",
+      main: [
+        { years: "1988", m883: 170, m1200: 200 },
+        { years: "1989–1991", m883: 175, m1200: 175 },
+        { years: "1992–1995", m883: 160, m1200: 170 },
+        { years: "1996", m883: 160, m1200: 179 },
+        { years: "1997", m883: 160, m1200: 170 },
+        { years: "1998–2003", m883: 160, m1200: 170, m1200S: 195, note: "1200/1200C 170; 1200S 195" }
+      ],
+      pilot: [
+        { years: "1988", m883: 35, m1200: 35 },
+        { years: "1989–1991", m883: 45, m1200: 45 },
+        { years: "1992–1995", m883: 40, m1200: 40 },
+        { years: "1996–2003", m883: 42, m1200: 42 }
+      ]
+    },
+    california: {
+      label: "California",
+      main: [
+        { years: "1988", m883: 165, m1200: 180 },
+        { years: "1989", m883: 155, m1200: 160 },
+        { years: "1990–1991", m883: 160, m1200: 160 },
+        { years: "1992", m883: 160, m1200: 170 },
+        { years: "1993–1997", m883: 170, m1200: 185 },
+        { years: "1998–2003", m883: 170, m1200: 185, m1200S: 195, note: "1200/1200C 185; 1200S 195" }
+      ],
+      pilot: [
+        { years: "1988", m883: 35, m1200: 35 },
+        { years: "1989", m883: 42, m1200: 42 },
+        { years: "1990–1991", m883: 42, m1200: 42 },
+        { years: "1992–1995", m883: 40, m1200: 40 },
+        { years: "1996–2003", m883: 42, m1200: 42 }
+      ]
+    },
+    hdi: {
+      label: "HDI (international)",
+      main: [
+        { years: "1993–1994", m883: 160, m1200: 160 },
+        { years: "1995–1997", m883: 190, m1200: 190 },
+        { years: "1998", m883: 190, m1200: 190, m1200S: 195, note: "1200/1200C 190; 1200S 195" },
+        { years: "1999–2003", m883: 190, m1200: 200 }
+      ],
+      pilot: [
+        { years: "1993–1994", m883: 40, m1200: 40 },
+        { years: "1995–2003", m883: 42, m1200: 42 }
+      ]
+    },
+    swiss: {
+      label: "Swiss",
+      main: [
+        { years: "1995", m883: 160, m1200: 160 },
+        { years: "1996–1997", m883: 190, m1200: 190 },
+        { years: "1998", m883: 190, m1200: 190, m1200S: 195, note: "1200/1200C 190; 1200S 195" },
+        { years: "1999–2003", m883: 190, m1200: 200 }
+      ],
+      pilot: [
+        { years: "1995", m883: 40, m1200: 40 },
+        { years: "1996–2003", m883: 42, m1200: 42 }
+      ]
+    },
+    floatHeight: [
+      { years: "1988–1991", value: "0.725–0.730 in (18.4–18.5 mm)" },
+      { years: "1992–2003", value: "0.413–0.453 in (10.5–11.5 mm)" }
+    ]
+  },
+  sportster_tire_pressures: {
+    source: "Clymer Sportster 1986–2003, Ch. 3 Table 2 (p. 149), read visually",
+    note: "Cold pressures, original-equipment tires. Aftermarket tires may need a different pressure. 300 lb load includes rider, passenger and cargo. GVWR is on a decal on the frame.",
+    upTo300lb: {
+      front: [
+        { models: "1200 models", psi: 30, kpa: 207 },
+        { models: "883 and 1100 models, 1986–1990", psi: 26, kpa: 179 },
+        { models: "883 and 1100 models, 1991–2003", psi: 30, kpa: 207 }
+      ],
+      rear: [
+        { models: "1200 models", psi: 36, kpa: 248 },
+        { models: "883 and 1100 models, 1986–1990", psi: 30, kpa: 207 },
+        { models: "883 and 1100 models, 1991–2003", psi: 36, kpa: 248 }
+      ]
+    },
+    upToGVWR: {
+      front: [
+        { models: "1200 models", psi: 30, kpa: 207 },
+        { models: "883 and 1100 models, 1986–1990", psi: 26, kpa: 179 },
+        { models: "883 and 1100 models, 1991–2003", psi: 30, kpa: 207 }
+      ],
+      rear: [
+        { models: "1200 models", psi: 40, kpa: 276 },
+        { models: "883 and 1100 models, 1986–1990", psi: 32, kpa: 221 },
+        { models: "883 and 1100 models, 1991–2003", psi: 40, kpa: 276 }
+      ]
+    }
+  },
+  sportster_fork_oil: {
+    source: "Clymer Sportster 1986–2003, Ch. 3 Table 6 (p. 150), read visually",
+    note: "Front fork oil capacity per leg. Wet = after a drain; dry = after a full disassembly. Fork oil: H-D Type E or equivalent (Table 5, p. 149).",
+    rows: [
+      { years: "1986–1987", wetOz: 5.4, wetMl: 160, dryOz: 6.4, dryMl: 189 },
+      { years: "1988–1991", wetOz: 9.0, wetMl: 266, dryOz: 10.2, dryMl: 302 },
+      { years: "1992–1998, 883 Hugger", wetOz: 10.7, wetMl: 316, dryOz: 12.1, dryMl: 358 },
+      { years: "1992–1998, all other models", wetOz: 9.0, wetMl: 266, dryOz: 10.2, dryMl: 302 },
+      { years: "1999–2003", wetOz: 9.0, wetMl: 266, dryOz: 10.2, dryMl: 302 }
     ]
   },
   /* Local spots — Joshua's home turf, Glendale/Phoenix AZ. Every entry was

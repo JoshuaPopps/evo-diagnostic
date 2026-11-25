@@ -1,7 +1,7 @@
 /* The Evo Diagnostic — service worker. Cache-first, offline-first. */
-const CACHE = "evo-diagnostic-v11";
+const CACHE = "evo-diagnostic-v15";
 const ASSETS = [
-  ".", "index.html", "styles.css", "manifest.json", "data.js", "vin.js", "scoring.js", "app.js", "sw-update.js", "audio.js", "tire.js", "shop.js", "nhtsa.js", "handoff.js",
+  ".", "index.html", "styles.css", "manifest.json", "data.js", "vin.js", "scoring.js", "app.js", "sw-update.js", "pg-parts-core.js", "audio.js", "tire.js", "shop.js", "nhtsa.js", "handoff.js", "wizard.js", "report.js",
   "icon-192.png", "icon-512.png", "data/nhtsa-evo-bundle.json",
   "assets/fat-boy-1992.jpg", "assets/fat-boy-1990-museum.jpg",
   "assets/heritage-softail-classic.jpg", "assets/xlh-1200-modded.jpg",

@@ -139,8 +139,8 @@ eq("data.js Sportster model CH", D.vin.model_codes.CH, "XL1200S Sport");
 eq("data.js engine code P", D.vin.engine_codes.P, "1200cc (Sportster)");
 eq("data.js plant code Y", D.vin.plant_codes.Y, "York, PA");
 
-/* --- trees: 13 now (11 + rich/flood + transmission) --- */
-eq("trees count is 13", D.trees.length, 13);
+/* --- trees: 14 now (13 + smoking / oil consumption, batch 2) --- */
+eq("trees count is 14", D.trees.length, 14);
 check("oil-leak tree present", D.trees.some((t) => t.id === "oil-leak"));
 check("clutch tree present", D.trees.some((t) => t.id === "clutch"));
 check("lights tree present", D.trees.some((t) => t.id === "lights"));
@@ -176,6 +176,46 @@ eq("complaint bars: 14 components", bars.length, 14);
 eq("top complaint component is engine, 10", bars[0].component + "|" + bars[0].count, "ENGINE AND ENGINE COOLING|10");
 check("complaint bar percentages sum to ~100", Math.abs(bars.reduce((a, b) => a + b.pct, 0) - 100) <= 2);
 
+/* --- NHTSA complaint counts on causes (BlueDriver steal) --- */
+const counts = bundle.complaint_counts_by_component;
+check("complaint family counts sum to the 61 total",
+  Object.values(counts).reduce((a, b) => a + b, 0) === bundle.complaint_total);
+eq("brakes leak cause maps to SERVICE BRAKES, HYDRAULIC 9",
+  NH.complaintForCause(counts, "Brakes", "Leak (reservoir, line, caliper seal)").count, 9);
+eq("lifter tick maps to ENGINE AND ENGINE COOLING 10",
+  NH.complaintForCause(counts, "Engine", "Lifter tick").count, 10);
+eq("carb cause maps to FUEL SYSTEM, GASOLINE 7",
+  NH.complaintForCause(counts, "Carb / fuel", "Main jet too small").count, 7);
+eq("advance-mechanism override beats the carb system default",
+  NH.complaintForCause(counts, "Carb / fuel", "Worn advance mechanism — idle hangs ~1,600 rpm then drops").family, "ENGINE AND ENGINE COOLING");
+eq("bulb cause maps to EXTERIOR LIGHTING 4",
+  NH.complaintForCause(counts, "Electrical / lights", "Bulb / socket at the lamp").count, 4);
+eq("jackshaft cause maps to POWER TRAIN 7",
+  NH.complaintForCause(counts, "Starting", "Jackshaft worn or mismatched — starter spins but won't engage").count, 7);
+check("wrong tire pressure shows no count (maintenance, not a defect family)",
+  NH.complaintForCause(counts, "Suspension / wheels / tires", "Wrong tire pressure") === null);
+check("wheels-not-on-same-track shows no count (no single family)",
+  NH.complaintForCause(counts, "Suspension / wheels / tires", "Wheels not on the same track — asymmetric handling") === null);
+check("belt-rub hiss shows no count (mixed sources span families)",
+  NH.complaintForCause(counts, "Engine", "Hiss from belt rub, pinched vent, or cap venting") === null);
+check("every cause maps to a real bundle family or to nothing, and every count matches the bundle exactly",
+  D.trees.every((t) => t.causes.every((c) => {
+    const hit = NH.complaintForCause(counts, t.system, c.cause);
+    return hit === null || (Object.prototype.hasOwnProperty.call(counts, hit.family) && counts[hit.family] === hit.count);
+  })));
+check("the multi-family complaint key is never used as a cause family",
+  D.trees.every((t) => t.causes.every((c) => {
+    const hit = NH.complaintForCause(counts, t.system, c.cause);
+    return hit === null || hit.family !== "FUEL SYSTEM, GASOLINE,ELECTRICAL SYSTEM,EQUIPMENT";
+  })));
+check("every per-cause override key is a real cause in the trees",
+  Object.keys(NH.CAUSE_FAMILY).every((k) => D.trees.some((t) => t.causes.some((c) => c.cause === k))));
+check("complaint label names the family and the count",
+  NH.complaintLabel({ family: "ENGINE AND ENGINE COOLING", count: 10 }) === "10 owner complaints filed for this system (NHTSA — ENGINE AND ENGINE COOLING)");
+check("app.js wires the complaint count into the ranked-cause display",
+  fs.readFileSync(path.join(__dirname, "app.js"), "utf8").includes("complaintForCause") &&
+  fs.readFileSync(path.join(__dirname, "app.js"), "utf8").includes("complaintLabel"));
+
 /* --- flash codes (1998 XL1200S, factory table) --- */
 eq("flash codes count is 10", D.flash_codes.length, 10);
 eq("code 12 is MAP Sensor", D.flash_codes.find((f) => f.code === 12).desc, "MAP Sensor");
@@ -193,33 +233,38 @@ const partIds = [...new Set([...html.matchAll(/data-part="([^"]+)"/g)].map((m) =
 check("every data-part id in the diagrams has a record (" + partIds.length + " ids)",
   partIds.every((id) => Object.prototype.hasOwnProperty.call(D.parts, id)));
 
-/* --- parts & prices (live-checked Nov 24, 2026; no invented labor) --- */
-const priceRecs = Object.values(D.prices);
+/* --- parts & prices (live-checked Nov 24, 2026; no invented labor) ---
+   Prices live in the shared parts core (pg-parts-core.js), vendored
+   verbatim — data.js holds no prices any more. The app reads them via
+   PG_PartsCore.getPrice; every check below does the same. */
+const Core = require("./pg-parts-core.js");
+const coreSrc = fs.readFileSync(path.join(__dirname, "pg-parts-core.js"), "utf8");
+const priceRecs = Core.listParts();
 eq("prices: 42 keys (40 priced records + the rubber-plug and jackshaft pointers)", priceRecs.length, 42);
 eq("prices: 40 priced records", priceRecs.filter((r) => typeof r.price === "number").length, 40);
 check("every priced record has a name, a positive price, a source, a link, and the check date",
   priceRecs.filter((r) => typeof r.price === "number").every((r) =>
     r.name && r.price > 0 && r.source && r.url.startsWith("https://") && r.date === "2026-11-24"));
-check("cheapest verified price is the pilot jet at $4.99", D.prices["pilot-jet"].price === 4.99);
-check("most expensive verified price is the transmission kit at $429.00", D.prices["transmission"].price === 429.00);
-check("every cause part key exists in prices",
+check("cheapest verified price is the pilot jet at $4.99", Core.getPrice("pilot-jet").price === 4.99);
+check("most expensive verified price is the transmission kit at $429.00", Core.getPrice("transmission").price === 429.00);
+check("every cause part key exists in the parts core",
   D.trees.every((t) => t.causes.every((c) => !c.part ||
-    (Array.isArray(c.part) ? c.part : [c.part]).every((k) => Object.prototype.hasOwnProperty.call(D.prices, k)))));
-eq("62 of 91 causes name a part", D.trees.reduce((n, t) => n + t.causes.filter((c) => c.part).length, 0), 62);
+    (Array.isArray(c.part) ? c.part : [c.part]).every((k) => Core.getPrice(k) !== null))));
+eq("62 of 104 causes name a part", D.trees.reduce((n, t) => n + t.causes.filter((c) => c.part).length, 0), 62);
 check("every atlas part except the rubber plug and jackshaft has a live price",
-  Object.keys(D.parts).every((k) => k === "rubber-plug" || k === "jackshaft" || typeof D.prices[k] === "object" && typeof D.prices[k].price === "number"));
+  Object.keys(D.parts).every((k) => k === "rubber-plug" || k === "jackshaft" || (Core.getPrice(k) !== null && typeof Core.getPrice(k).price === "number")));
 check("rubber plug points at the rebuild kit instead of a fake price",
-  D.prices["rubber-plug"].see === "carb-body" && typeof D.prices["rubber-plug"].price === "undefined");
+  Core.getPrice("rubber-plug").see === "carb-body" && typeof Core.getPrice("rubber-plug").price === "undefined");
 check("jackshaft points at the starter instead of a fake price (no standalone price verified)",
-  D.prices["jackshaft"].see === "starter" && typeof D.prices["jackshaft"].price === "undefined");
+  Core.getPrice("jackshaft").see === "starter" && typeof Core.getPrice("jackshaft").price === "undefined");
 check("battery price carries the year-split note (1990 only, 1995 takes YTX20)",
-  D.prices["battery"].note.includes("1990") && D.prices["battery"].note.includes("YTX20"));
+  Core.getPrice("battery").note.includes("1990") && Core.getPrice("battery").note.includes("YTX20"));
 check("belt price carries the year-split note (1995-1999 only)",
-  D.prices["belt"].note.includes("1995-1999"));
+  Core.getPrice("belt").note.includes("1995-1999"));
 check("shocks price flags the per-pair-or-each unknown",
-  D.prices["shocks"].note.includes("per pair or per shock"));
+  Core.getPrice("shocks").note.includes("per pair or per shock"));
 check("main-jet price flags the family-page read",
-  D.prices["main-jet"].note.includes("family page"));
+  Core.getPrice("main-jet").note.includes("family page"));
 check("app.js renders prices into results and the part detail",
   fs.readFileSync(path.join(__dirname, "app.js"), "utf8").includes("priceHtml(c.part)") &&
   fs.readFileSync(path.join(__dirname, "app.js"), "utf8").includes("priceHtml(el.dataset.part)"));
@@ -269,34 +314,57 @@ check("every local url is empty or an http(s) link", D.local_shops.every((s) => 
 check("no California Glendale dealer slipped in", D.local_shops.every((s) => !s.phone.includes("818") && !s.name.includes("Glendale, CA")));
 check("index.html has the local list", html.includes('id="local-list"'));
 
-/* --- torque & specs (FSM #99482-98 §2) --- */
-eq("torque table has 18 rows", D.torque.rows.length, 18);
-check("every torque row has a fastener and a ft-lb or in-lb value",
-  D.torque.rows.every((r) => r.fastener && /ft-lbs|in-lbs/.test(r.value)));
+/* --- torque & specs (FSM #99482-98 §2) ---
+   Torque values live in the shared parts core; data.js holds only the
+   index (table id + ordered slug list). Every check below resolves
+   through the core, the way the app does. */
+const torqueTable = (id) => Core.listTorqueTables().find((t) => t.id === id);
+const torqueRow = (id, slug) => Core.getTorque(id, slug);
+eq("torque §2 table has 18 rows", D.torque.sec2.slugs.length, 18);
+check("every §2 row resolves in the core with a fastener and a ft-lb or in-lb value",
+  D.torque.sec2.slugs.every((s) => { const r = torqueRow("fsm-99482-98-sec2", s); return r && r.fastener && /ft-lbs|in-lbs/.test(r.value); }));
 /* --- chapter torque tables (FSM #99482-98 §3/§4/§5/§6/§8, read visually) --- */
-eq("torque chapters: 6 systems", D.torque.chapters.length, 6);
-eq("torque chapter rows total 53", D.torque.chapters.reduce((n, c) => n + c.rows.length, 0), 53);
-check("every chapter has a title, a page ref and rows",
-  D.torque.chapters.every((c) => c.title && c.ref && c.rows.length > 0));
-check("every chapter row has a fastener and a value",
-  D.torque.chapters.every((c) => c.rows.every((r) => r.fastener && r.value)));
-const ch = (t) => D.torque.chapters.find((c) => c.title === t);
+eq("torque chapters: 6 module systems (+ the local Clymer chapter)", D.torque.chapters.length, 6);
+eq("torque chapter rows total 82 (53 module + 29 local Clymer rows)",
+  D.torque.chapters.reduce((n, c) => n + c.slugs.length, 0) + D.torque.clymer.rows.length, 82);
+check("every chapter index has a table id, a title, a page ref and slugs",
+  D.torque.chapters.every((c) => c.id && c.title && c.ref && c.slugs.length > 0));
+check("every chapter slug resolves in the core with a fastener and a value",
+  D.torque.chapters.every((c) => c.slugs.every((s) => { const r = torqueRow(c.id, s); return r && r.fastener && r.value; })));
+/* The index must cover every module row exactly — no missing row, no
+   stale slug: parse the vendored module source for its slug inventory
+   per table and compare against the index (order included). */
+check("torque index covers every module row exactly (ids, slugs, order)",
+  (() => {
+    const perTable = {};
+    const re = /id: "([^"]+)"[\s\S]*?rows: \[([\s\S]*?)\n      \]/g;
+    let mm;
+    while ((mm = re.exec(coreSrc))) {
+      const slugs = [...mm[2].matchAll(/"slug":"([^"]+)"/g)].map((x) => x[1]);
+      if (slugs.length) perTable[mm[1]] = slugs;
+    }
+    if (JSON.stringify(perTable["fsm-99482-98-sec2"]) !== JSON.stringify(D.torque.sec2.slugs)) return false;
+    return D.torque.chapters.every((c) => JSON.stringify(perTable[c.id]) === JSON.stringify(c.slugs));
+  })());
+check("chapter titles match the module's table titles (no drift)",
+  D.torque.chapters.every((c) => torqueTable(c.id) && torqueTable(c.id).title === c.title));
+const ch = (t) => { const c = D.torque.chapters.find((x) => x.title === t); return c ? c.slugs.map((s) => torqueRow(c.id, s)) : []; };
 check("crank pin nut is 180-210 ft-lbs",
-  ch("Engine").rows.some((r) => r.fastener === "Crank pin nut" && r.value.startsWith("180-210 ft-lbs")));
+  ch("Engine").some((r) => r.fastener === "Crank pin nut" && r.value.startsWith("180-210 ft-lbs")));
 check("compensating sprocket nut is 150-165 ft-lbs",
-  ch("Clutch & primary").rows.some((r) => r.fastener === "Compensating sprocket nut" && r.value.startsWith("150-165 ft-lbs")));
+  ch("Clutch & primary").some((r) => r.fastener === "Compensating sprocket nut" && r.value.startsWith("150-165 ft-lbs")));
 check("transmission sprocket nut is 50 ft-lbs + a 30-45 degree turn",
-  ch("Clutch & primary").rows.some((r) => r.fastener === "Transmission sprocket nut" && r.value.includes("50 ft-lbs") && r.value.includes("30")));
+  ch("Clutch & primary").some((r) => r.fastener === "Transmission sprocket nut" && r.value.includes("50 ft-lbs") && r.value.includes("30")));
 check("neutral switch differs by year (1997 3-5, 1998 10-15)",
-  ch("Electrical & charging").rows.some((r) => r.fastener === "Neutral switch (1997 models)" && r.value.startsWith("3-5 ft-lbs")) &&
-  ch("Electrical & charging").rows.some((r) => r.fastener === "Neutral switch (1998 models)" && r.value.startsWith("10-15 ft-lbs")));
+  ch("Electrical & charging").some((r) => r.fastener === "Neutral switch (1997 models)" && r.value.startsWith("3-5 ft-lbs")) &&
+  ch("Electrical & charging").some((r) => r.fastener === "Neutral switch (1998 models)" && r.value.startsWith("10-15 ft-lbs")));
 check("cylinder head + crankcase bolts point to the §3 sequences, not a value",
-  ch("Engine").rows.some((r) => r.fastener === "Cylinder head bolts" && r.value.includes("Cylinder Head Torque Sequence")) &&
-  ch("Engine").rows.some((r) => r.fastener === "Crankcase stud nut" && r.value.includes("Crankcase Torque Sequence")));
+  ch("Engine").some((r) => r.fastener === "Cylinder head bolts" && r.value.includes("Cylinder Head Torque Sequence")) &&
+  ch("Engine").some((r) => r.fastener === "Crankcase stud nut" && r.value.includes("Crankcase Torque Sequence")));
 check("torque source cites the chapter pages", D.torque.source.includes("§3 p. 3-2") && D.torque.source.includes("§8 p. 8-1") && D.torque.source.includes("3-21") && D.torque.source.includes("3-66"));
 /* --- torque sequences (FSM #99482-98 §3, verified from rendered pages Nov 24-25) --- */
 eq("torque sequences: 2", D.torque.sequences.length, 2);
-const sq = (id) => D.torque.sequences.find((s) => s.id === id);
+const sq = (id) => Core.getTorqueSequence(id);
 eq("head sequence has 3 passes", sq("head-bolts").passes.length, 3);
 check("head pass 1 is 7-9 ft-lbs", sq("head-bolts").passes[0].value.includes("7–9 ft-lbs"));
 check("head pass 2 is 12-14 ft-lbs", sq("head-bolts").passes[1].value.includes("12–14 ft-lbs"));
@@ -308,7 +376,7 @@ check("crankcase pass 1 is 10 ft-lbs", sq("crankcase").passes[0].value.includes(
 check("crankcase pass 2 is 15-17 ft-lbs (20-23 Nm)", sq("crankcase").passes[1].value.includes("15–17 ft-lbs (20–23 Nm)"));
 check("crankcase figure has 8 positions", sq("crankcase").figure.includes("8 positions"));
 check("crankcase note flags the FSM 20-35 Nm misprint", (sq("crankcase").note || "").includes("20–35 Nm") && (sq("crankcase").note || "").includes("misprint"));
-check("no sequence value uses the misprinted 20-35 Nm as a real figure", D.torque.sequences.every((s) => s.passes.every((p) => !p.value.includes("20–35"))));
+check("no sequence value uses the misprinted 20-35 Nm as a real figure", D.torque.sequences.map((id) => Core.getTorqueSequence(id)).every((s) => s.passes.every((p) => !p.value.includes("20–35"))));
 check("index.html has the sequences card", html.includes('id="torque-sequences"'));
 check("app.js renders the sequences", fs.readFileSync(path.join(__dirname, "app.js"), "utf8").includes("torque-sequences") && fs.readFileSync(path.join(__dirname, "app.js"), "utf8").includes("SEQ_SVG_HEAD"));
 check("oil capacity is 3.0 qt with filter", D.torque.capacities.all.includes("3.0 qt"));
@@ -319,6 +387,39 @@ check("every model has length, wheelbase, saddle, height, dry weight, GVWR",
   D.torque.dimensions.every((d) => d.model && d.length && d.wheelbase && d.saddle && d.height && d.dry && d.gvwr));
 check("torque source cites FSM 99482-98 §2", D.torque.source.includes("99482-98"));
 check("index.html has the Torque tab and search", html.includes('data-tab="torque"') && html.includes('id="torque-search"') && html.includes('id="torque-table"') && html.includes('id="torque-chapters"'));
+
+/* --- shared parts core wiring (pg-parts-core.js v1, batch 2) ---
+   The app reads prices + torque from the module; data.js holds only
+   keys. These checks pin the wiring, not just the values. */
+check("data.js carries no inline prices", !("prices" in D));
+check("data.js carries no inline torque rows or sequence objects",
+  !("rows" in D.torque) && D.torque.chapters.every((c) => !("rows" in c)) &&
+  D.torque.sequences.every((id) => typeof id === "string"));
+check("pg-parts-core.js vendored byte-identical to canonical",
+  fs.readFileSync(path.join(__dirname, "pg-parts-core.js"), "utf8") ===
+  fs.readFileSync(path.join(__dirname, "..", "..", "pg-parts-core.js"), "utf8"));
+check("index.html loads pg-parts-core.js before app.js",
+  html.includes('src="pg-parts-core.js"') && html.indexOf('src="pg-parts-core.js"') < html.indexOf('src="app.js"'));
+check("sw.js precaches pg-parts-core.js",
+  fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("pg-parts-core.js"));
+check("app.js reads prices and torque from the parts core, never from data.js",
+  (() => {
+    const a = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
+    return a.includes("PartsCore.getPrice") && a.includes("PartsCore.getTorque") &&
+      a.includes("PartsCore.getTorqueSequence") && !a.includes("D.prices") &&
+      !a.includes("D.torque.rows") && !a.includes("D.torque.sequences.map((s)");
+  })());
+check("parts core validates clean", Core.validate() === true);
+check("parts core is v1, data current to Nov 24, 2026", Core.version === 1 && Core.dataAsOf === "2026-11-24");
+check("no shop labor rate exists in the parts core", typeof Core.shopCost === "undefined");
+check("unknown part key returns null, never another part's price", Core.getPrice("no-such-part") === null);
+check("unknown torque table/slug returns null, never another manual's value",
+  Core.getTorque("no-such-table", "spark-plug") === null && Core.getTorque("fsm-99482-98-ch3", "no-such-fastener") === null);
+check("torque source line in data.js matches the module's source line",
+  (() => {
+    const mm = coreSrc.match(/source: "(Harley-Davidson[^"]*)"/);
+    return !!mm && mm[1] === D.torque.source;
+  })());
 
 /* --- Joshua's own atlas photos --- */
 eq("own_photos has the Softail still", D.own_photos.length, 1);
@@ -332,9 +433,10 @@ check("manifest wires icon-192", (manifest.icons || []).some((i) => i.sizes === 
 check("manifest wires icon-512", (manifest.icons || []).some((i) => i.sizes === "512x512"));
 check("icon-512.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-512.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
 check("icon-192.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-192.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
-check("sw.js caches v11", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v11"));
-check("sw.js precaches tire.js + nhtsa.js + handoff.js + sw-update.js + shop.js", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("tire.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("nhtsa.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("handoff.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("sw-update.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("shop.js"));
-check("index.html loads tire.js + nhtsa.js + handoff.js + shop.js", html.includes('src="tire.js"') && html.includes('src="nhtsa.js"') && html.includes('src="handoff.js"') && html.includes('src="shop.js"'));
+check("sw.js caches v15", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v15"));
+check("sw.js precaches tire.js + nhtsa.js + handoff.js + sw-update.js + shop.js + wizard.js + report.js", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("tire.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("nhtsa.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("handoff.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("sw-update.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("shop.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("wizard.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("report.js"));
+check("index.html loads tire.js + nhtsa.js + handoff.js + shop.js + wizard.js + report.js", html.includes('src="tire.js"') && html.includes('src="nhtsa.js"') && html.includes('src="handoff.js"') && html.includes('src="shop.js"') && html.includes('src="wizard.js"') && html.includes('src="report.js"'));
+check("index.html loads wizard.js + report.js before app.js", html.indexOf('src="wizard.js"') < html.indexOf('src="app.js"') && html.indexOf('src="report.js"') < html.indexOf('src="app.js"'));
 check("index.html has the new sections", ["part-detail", "flash-input", "tire-input", "clip-record", "history-list", "add-bike-model"].every((id) => html.includes('id="' + id + '"')));
 D.cc_photos.forEach((p) => check("CC photo present: " + p.file, fs.existsSync(path.join(__dirname, p.file))));
 check("all CC photos have credits", D.cc_photos.every((p) => p.credit.includes("CC BY")));
@@ -343,7 +445,7 @@ check("suppliers are link-only", D.parts_suppliers.every((s) => s.url.startsWith
 /* --- new atlas parts (priced extras, Nov 24) --- */
 ["main-jet", "pilot-jet", "float", "plug-wires", "starter", "wheel-bearing", "intake-seals", "dot5-fluid", "exhaust-gaskets", "primary-shoe"].forEach((k) => {
   check("atlas part exists: " + k, !!D.parts[k] && !!D.parts[k].fn && !!D.parts[k].spec && !!D.parts[k].failures && !!D.parts[k].source);
-  check("atlas part has a live price: " + k, !!D.prices[k]);
+  check("atlas part has a live price: " + k, !!Core.getPrice(k));
 });
 eq("atlas part count is 41", Object.keys(D.parts).length, 41);
 check("starter draw spec is 160-180, over 200 = fault", D.parts["starter"].spec.includes("160–180") && D.parts["starter"].spec.includes("over 200 amps = fault"));
@@ -401,7 +503,7 @@ check("every new-tree step yes-value is mapped in scoring",
   [richTree, transTree].every((t) => t.steps.every((s) => !s.yes || s.yes === "next" || Object.prototype.hasOwnProperty.call(S.YES_MAP, s.yes))));
 
 /* --- library sweep (Nov 24-25, 2026): Easyriders tips + Sportster/Clymer layer --- */
-eq("91 causes total after the sweep", D.trees.reduce((n, t) => n + t.causes.length, 0), 91);
+eq("104 causes total after batch 2 overlooked (100 + 4)", D.trees.reduce((n, t) => n + t.causes.length, 0), 104);
 check("every tree's weights sum to 100",
   D.trees.every((t) => t.causes.reduce((n, c) => n + c.weight, 0) === 100));
 check("every tree step yes-value is mapped in scoring",
@@ -412,11 +514,14 @@ check("magazine causes are flagged NOT an FSM cause or tied to an FSM corroborat
   D.trees.every((t) => t.causes.every((c) => !c.source || !c.source.includes("Easyriders") || c.source.includes("NOT an FSM cause") || c.source.includes("FSM"))));
 const sportsterChapter = D.torque.chapters.find((c) => c.title.startsWith("Sportster"));
 check("Sportster torque chapter present", !!sportsterChapter);
-eq("Sportster torque chapter has 2 rows", sportsterChapter.rows.length, 2);
+eq("Sportster torque chapter has 2 rows", sportsterChapter.slugs.length, 2);
 check("Sportster clutch cover screws 84-108 in-lbs (conflicts with Softail 50-70)",
-  sportsterChapter.rows[0].value.includes("84–108 in-lbs") && sportsterChapter.rows[0].value.includes("50–70"));
+  torqueRow("sportster-86-03", "clutch-inspection-cover-screws").value.includes("84–108 in-lbs") && torqueRow("sportster-86-03", "clutch-inspection-cover-screws").value.includes("50–70"));
 check("Sportster spark plug 11-18 ft-lbs (Softail is 18-22)",
-  sportsterChapter.rows[1].value.includes("11–18 ft-lbs") && sportsterChapter.rows[1].value.includes("18–22"));
+  torqueRow("sportster-86-03", "spark-plug").value.includes("11–18 ft-lbs") && torqueRow("sportster-86-03", "spark-plug").value.includes("18–22"));
+check("same slug, different table: Softail clutch cover is 50-70 in-lbs, never the Sportster value",
+  torqueRow("fsm-99482-98-ch6", "clutch-inspection-cover-screws").value.includes("50-70 in-lbs") &&
+  !torqueRow("fsm-99482-98-ch6", "clutch-inspection-cover-screws").value.includes("84–108"));
 check("capacities carry the Sportster transmission/primary split",
   D.torque.capacities.sportster.includes("24 oz") && D.torque.capacities.sportster.includes("32 oz"));
 check("app.js renders the Sportster capacities line", appjs.includes("capacities.sportster"));
@@ -439,9 +544,9 @@ const brakesTree = D.trees.find((t) => t.id === "brakes");
 const noStartTree = D.trees.find((t) => t.id === "no-start");
 const noiseTree = D.trees.find((t) => t.id === "engine-noise");
 eq("oil-leak tree has 10 causes", oilTree.causes.length, 10);
-eq("wheels tree has 8 causes", wheelsTree.causes.length, 8);
+eq("wheels tree has 9 causes", wheelsTree.causes.length, 9);
 eq("brakes tree has 7 causes", brakesTree.causes.length, 7);
-eq("no-start tree has 7 causes", noStartTree.causes.length, 7);
+eq("no-start tree has 8 causes", noStartTree.causes.length, 8);
 eq("engine-noise tree has 7 causes", noiseTree.causes.length, 7);
 check("Vol. 3 reversion cause is flagged NOT an FSM cause",
   richTree.causes.some((c) => c.cause.includes("Reversion spitback") && c.source.includes("NOT an FSM cause") && c.source.includes("Tips Vol. 3")));
@@ -468,6 +573,62 @@ check("transmission clutch-drag yes bumps only the clutch cause by 15",
   S.applyAnswer(transBase, transTree.causes, "clutch-drag", true)["Clutch dragging (slight drag makes shifts hard and neutral hard to find)"] - 25 === 15 &&
   transTree.causes.filter((c) => !c.cause.includes("Clutch dragging")).every((c) => S.applyAnswer(transBase, transTree.causes, "clutch-drag", true)[c.cause] === c.weight));
 check("app.js renders cause sources in results", appjs.includes("c.source"));
+
+/* --- Tech Tips Vols 1, 2, 4 + The Biker (batch 2 "overlooked", Nov 25, 2026) ---
+   Four genuinely new causes, one per tree, each neighbor-checked and
+   flagged NOT an FSM cause. The Biker (July 1980) yielded nothing
+   Evo-applicable — 95 chunks of road tests on other marques — so it
+   contributes no cause here. Rebalances keep every touched tree at 100:
+   lean-idle enrichener 10→5, no-start fuel delivery 20→15, wheels
+   suspension 10→5, clutch primary oil 10→5. */
+const leanTree = D.trees.find((t) => t.id === "carb-lean-idle");
+const clutchTree = D.trees.find((t) => t.id === "clutch");
+eq("lean-idle tree has 8 causes", leanTree.causes.length, 8);
+eq("clutch tree has 7 causes", clutchTree.causes.length, 7);
+check("batch 2 breather cause flagged Vol. 2 §36",
+  leanTree.causes.some((c) => c.cause.includes("Float-bowl breather") && c.source.includes("NOT an FSM cause") && c.source.includes("Vol. 2, §36")));
+check("batch 2 petcock-screens cause flagged Vol. 2 §16",
+  noStartTree.causes.some((c) => c.cause.includes("Petcock filter screens") && c.source.includes("NOT an FSM cause") && c.source.includes("Vol. 2, §16")));
+check("batch 2 tire-weave cause flagged Vol. 2 §97",
+  wheelsTree.causes.some((c) => c.cause.includes("Wrong tire for the bike") && c.source.includes("NOT an FSM cause") && c.source.includes("Vol. 2, §97")));
+check("batch 2 pushrod cause flagged Vol. 4 §79",
+  clutchTree.causes.some((c) => c.cause.includes("Pressure plate lifts uneven") && c.source.includes("NOT an FSM cause") && c.source.includes("Vol. 4, §79")));
+check("batch 2 rebalances keep the four touched trees at 100",
+  [leanTree, noStartTree, wheelsTree, clutchTree].every((t) => t.causes.reduce((n, c) => n + c.weight, 0) === 100));
+check("batch 2 rebalance values are the ones drafted",
+  leanTree.causes.find((c) => c.cause.includes("Enrichener circuit")).weight === 5 &&
+  noStartTree.causes.find((c) => c.cause.includes("Fuel delivery")).weight === 15 &&
+  wheelsTree.causes.find((c) => c.cause.includes("Suspension")).weight === 5 &&
+  clutchTree.causes.find((c) => c.cause.includes("Primary oil")).weight === 5);
+check("batch 2 new causes carry no part field (no price key to invent)",
+  [leanTree, noStartTree, wheelsTree, clutchTree].every((t) =>
+    t.causes.filter((c) => c.cause.includes("Float-bowl breather") || c.cause.includes("Petcock filter screens") || c.cause.includes("Wrong tire for the bike") || c.cause.includes("Pressure plate lifts uneven")).every((c) => !c.part)));
+const leanBase = {};
+leanTree.causes.forEach((c) => { leanBase[c.cause] = c.weight; });
+check("bowl-breather yes bumps only the breather cause by 15",
+  S.applyAnswer(leanBase, leanTree.causes, "bowl-breather", true)["Float-bowl breather pinched or pointed into the wind — erratic carb tune"] - 5 === 15 &&
+  leanTree.causes.filter((c) => !c.cause.includes("Float-bowl breather")).every((c) => S.applyAnswer(leanBase, leanTree.causes, "bowl-breather", true)[c.cause] === c.weight));
+const nsBase2 = {};
+noStartTree.causes.forEach((c) => { nsBase2[c.cause] = c.weight; });
+check("screens yes bumps only the petcock-screens cause by 15",
+  S.applyAnswer(nsBase2, noStartTree.causes, "screens", true)["Petcock filter screens blocked by rust after storage — fuel starvation"] - 5 === 15 &&
+  noStartTree.causes.filter((c) => !c.cause.includes("Petcock filter screens")).every((c) => S.applyAnswer(nsBase2, noStartTree.causes, "screens", true)[c.cause] === c.weight));
+const wheelsBase = {};
+wheelsTree.causes.forEach((c) => { wheelsBase[c.cause] = c.weight; });
+check("weave yes bumps only the tire-weave cause by 15",
+  S.applyAnswer(wheelsBase, wheelsTree.causes, "weave", true)["Wrong tire for the bike — high-speed wobble / weave"] - 5 === 15 &&
+  wheelsTree.causes.filter((c) => !c.cause.includes("Wrong tire for the bike")).every((c) => S.applyAnswer(wheelsBase, wheelsTree.causes, "weave", true)[c.cause] === c.weight));
+const clutchBase = {};
+clutchTree.causes.forEach((c) => { clutchBase[c.cause] = c.weight; });
+check("pushrod yes bumps only the pushrod cause by 15",
+  S.applyAnswer(clutchBase, clutchTree.causes, "pushrod", true)["Pressure plate lifts uneven — release pushrod grooved or unsupported, mainshaft bent"] - 5 === 15 &&
+  clutchTree.causes.filter((c) => !c.cause.includes("Pressure plate lifts uneven")).every((c) => S.applyAnswer(clutchBase, clutchTree.causes, "pushrod", true)[c.cause] === c.weight));
+check("batch 2 steps cite their sources",
+  [leanTree, noStartTree, wheelsTree, clutchTree].every((t) => t.steps.every((s) => !!s.cite)));
+eq("petcock-screens cause maps to FUEL SYSTEM, GASOLINE 7",
+  NH.complaintForCause(counts, "Starting", "Petcock filter screens blocked by rust after storage — fuel starvation").count, 7);
+check("wrong-tire cause shows no count (rider selection, like pressure)",
+  NH.complaintForCause(counts, "Suspension / wheels / tires", "Wrong tire for the bike — high-speed wobble / weave") === null);
 
 /* --- compression test card (FSM #99482-98 §3, pp. 3-11–3-12) --- */
 eq("compression tests: 6 steps", D.compression_tests.steps.length, 6);
@@ -505,15 +666,15 @@ check("no turn-signal/stop-light or circuit-protection block drawn in the starti
 
 /* --- four new atlas parts: specs + wording flags --- */
 check("intake-seals spec is 15-17 ft-lbs and quotes the align-then-tighten warning", D.parts["intake-seals"].spec.includes("15–17 ft-lbs") && D.parts["intake-seals"].spec.includes("Do not tighten capscrews and then try to align"));
-check("intake-seals price is $4.95", D.prices["intake-seals"].price === 4.95);
+check("intake-seals price is $4.95", Core.getPrice("intake-seals").price === 4.95);
 check("dot5-fluid spec is DOT 5 only, part no. 99902-77", D.parts["dot5-fluid"].spec.includes("99902-77") && D.parts["dot5-fluid"].spec.includes("Use only D.O.T. 5"));
 check("dot5-fluid record does NOT present 'never DOT 3/4' as an FSM quote", !D.parts["dot5-fluid"].spec.includes("never DOT 3/4") && !D.parts["dot5-fluid"].failures.includes("never DOT 3/4"));
-check("dot5-fluid price is $39.99", D.prices["dot5-fluid"].price === 39.99);
+check("dot5-fluid price is $39.99", Core.getPrice("dot5-fluid").price === 39.99);
 check("exhaust-gaskets spec has the flange-nut sequence and TORCA 45-60 ft-lbs", D.parts["exhaust-gaskets"].spec.includes("120 in-lbs") && D.parts["exhaust-gaskets"].spec.includes("45–60 ft-lbs") && D.parts["exhaust-gaskets"].spec.includes("one-time use"));
-check("exhaust-gaskets price is $8.95", D.prices["exhaust-gaskets"].price === 8.95);
+check("exhaust-gaskets price is $8.95", Core.getPrice("exhaust-gaskets").price === 8.95);
 check("primary-shoe spec is 5/8-7/8 in and 21-29 ft-lbs, alignment within 0.030 in", D.parts["primary-shoe"].spec.includes("5/8–7/8 in") && D.parts["primary-shoe"].spec.includes("21–29 ft-lbs") && D.parts["primary-shoe"].spec.includes("0.030 in"));
 check("primary-shoe replace rule quotes the FSM", D.parts["primary-shoe"].spec.includes("If the chain tensioner shoe is worn"));
-check("primary-shoe price is $8.79", D.prices["primary-shoe"].price === 8.79);
+check("primary-shoe price is $8.79", Core.getPrice("primary-shoe").price === 8.79);
 check("no factory part number attached to intake-seals, exhaust-gaskets or primary-shoe", !D.parts["intake-seals"].spec.match(/Part No\. \d/) && !D.parts["exhaust-gaskets"].spec.match(/Part No\. \d/) && D.parts["primary-shoe"].spec.includes("No factory part number"));
 
 /* --- handoff sending side (HANDOFF-FORMAT.md v1) --- */
@@ -710,6 +871,184 @@ check("app.js calls PG_SWUpdate.init", appjs.includes("PG_SWUpdate.init"));
 check("sw-update.js vendored byte-identical to canonical",
   fs.readFileSync(path.join(__dirname, "sw-update.js"), "utf8") ===
   fs.readFileSync(path.join(__dirname, "..", "..", "sw-update.js"), "utf8"));
+
+/* --- batch 2 (Nov 25, 2026): smoking tree + history + share + resume +
+   wizard + safety block + Sportster numbers --- */
+const smokeTree = D.trees.find((t) => t.id === "smoking-oil-consumption");
+check("smoking tree present", !!smokeTree);
+eq("smoking tree has 10 steps", smokeTree.steps.length, 10);
+eq("smoking tree has 9 causes", smokeTree.causes.length, 9);
+eq("smoking weights sum to 100", smokeTree.causes.reduce((n, c) => n + c.weight, 0), 100);
+check("smoking causes all carry their source", smokeTree.causes.every((c) => !!c.source));
+check("smoking over-rev cause is flagged NOT an FSM cause (Easyriders Vol. 3)",
+  smokeTree.causes.some((c) => c.cause.includes("Over-rev damage") && c.source.includes("NOT an FSM cause") && c.source.includes("Easyriders Tech Tips Vol. 3")));
+check("smoking white-steam cause cites Sportster p. 89 + trouble p. 58",
+  smokeTree.causes.some((c) => c.cause.includes("White smoke") && c.source.includes("Sportster 86-03 p. 89") && c.source.includes("sportster-86-03-trouble p. 58")));
+check("smoking rings cause carries NO part field (no piston-ring price verified)",
+  smokeTree.causes.find((c) => c.cause.includes("piston rings")).part === undefined);
+check("smoking step 1 is 'next' both ways — a blue-gray YES must never bump the white-steam cause",
+  smokeTree.steps[0].yes === "next" && smokeTree.steps[0].no === "next");
+check("smoking step 1 still cites FSM §3 p. 3-11 + Sportster p. 89",
+  smokeTree.steps[0].cite.includes("§3 p. 3-11") && smokeTree.steps[0].cite.includes("sportster-86-03 p. 89"));
+const smokeBase = {};
+smokeTree.causes.forEach((c) => { smokeBase[c.cause] = c.weight; });
+function smokeBump(key) { return S.applyAnswer(smokeBase, smokeTree.causes, key, true); }
+check("smoking rings yes bumps only the rings cause by 15",
+  smokeBump("rings")["Worn, broken, or stuck piston rings"] - 25 === 15 &&
+  smokeTree.causes.filter((c) => !c.cause.includes("piston rings")).every((c) => smokeBump("rings")[c.cause] === c.weight));
+check("smoking seals yes bumps only the guide-seals cause, NOT the over-rev cause",
+  smokeBump("seals")["Valve guide seals damaged, or stem-to-guide clearance excessive"] - 10 === 15 &&
+  smokeBump("seals")["Over-rev damage — valve collars smacked the seals after rev-limiter removal"] === 10);
+check("smoking over-rev yes bumps only the over-rev cause by 15",
+  smokeBump("over-rev")["Over-rev damage — valve collars smacked the seals after rev-limiter removal"] - 10 === 15 &&
+  smokeTree.causes.filter((c) => !c.cause.includes("Over-rev")).every((c) => smokeBump("over-rev")[c.cause] === c.weight));
+check("smoking rings-gasket yes bumps only the head-gasket cause by 15",
+  smokeBump("rings-gasket")["Blown head gasket"] - 10 === 15 &&
+  smokeTree.causes.filter((c) => !c.cause.includes("head gasket")).every((c) => smokeBump("rings-gasket")[c.cause] === c.weight));
+check("smoking exhaust-valve / intake-valve yes bump only their own valve cause",
+  smokeBump("exhaust-valve")["Leaking exhaust valve"] - 15 === 15 &&
+  smokeBump("intake-valve")["Leaking intake valve"] - 15 === 15 &&
+  smokeBump("exhaust-valve")["Leaking intake valve"] === 15);
+check("smoking overfill / carryover yes bump only their own cause",
+  smokeBump("overfill")["Oil overfill"] - 5 === 15 &&
+  smokeBump("carryover")["Oil carryover, clogged oil return passages, or head casting porosity"] - 5 === 15);
+
+/* --- shareable report (ED_Report.build, pure) --- */
+const R = require("./report.js");
+const repRanked = [
+  { cause: "Worn, broken, or stuck piston rings", score: 40, test: "Wet test — compression rises considerably with oil", fix: "Replace rings", source: "FSM #99482-98 §3 pp. 3-11–3-12 (diagnostic chart: Ring Trouble)", urgency: "high" },
+  { cause: "Oil overfill", score: 5, test: "Oil level above the full mark", fix: "Drain oil to the correct level", source: "FSM #99482-98 §3 p. 3-12 (Diagnosing Smoking Engine inspect list: Overfill)", urgency: "low" }
+];
+const rep = R.build({ bike: "1990 Softail", date: "Nov 25, 2026", tree: smokeTree, ranked: repRanked, verdict: "Fix before a real ride — Worn, broken, or stuck piston rings. Do not ride until fixed — oil burning plus low compression." });
+check("report names the bike and date", rep.includes("1990 Softail") && rep.includes("Nov 25, 2026"));
+check("report names the symptom (tree title + system)", rep.includes("Smoking exhaust / high oil consumption") && rep.includes("Engine / oil"));
+check("report carries the severity (top cause urgency)", rep.includes("Severity: high"));
+check("report carries the safe-to-ride verdict", rep.includes("Safe to ride? Fix before a real ride"));
+check("report ranks causes with percentages (40 of 45 = 89%)", rep.includes("1. Worn, broken, or stuck piston rings — 89%") && rep.includes("2. Oil overfill — 11%"));
+check("report carries every cause source", rep.includes("FSM #99482-98 §3 pp. 3-11–3-12") && rep.includes("Diagnosing Smoking Engine inspect list: Overfill"));
+check("report names the next step (top cause confirming test)", rep.includes("Next step: Wet test"));
+check("report closes with the run-the-test warning", rep.includes("Diagnosis only — run the confirming test before buying parts."));
+check("app.js shares via ED_Report + navigator.share with a clipboard fallback",
+  appjs.includes("ED_Report.build") && appjs.includes("navigator.share") && appjs.includes("navigator.clipboard.writeText"));
+check("app.js has both a Share and a Copy report button", appjs.includes("id='share-diag'") && appjs.includes("id='copy-diag'") && appjs.includes("Copy report"));
+
+/* --- wizard front step (ED_Wizard.suggest, pure) --- */
+const W = require("./wizard.js");
+eq("wizard engine suggests 3 trees", W.suggest("engine", "routine", D.trees).length, 3);
+check("wizard engine suggests the smoking tree", W.suggest("engine", "routine", D.trees).some((t) => t.id === "smoking-oil-consumption"));
+eq("wizard electrical suggests 4 trees", W.suggest("electrical", "routine", D.trees).length, 4);
+eq("wizard fuel suggests the two carb trees", W.suggest("fuel", "routine", D.trees).map((t) => t.id).join(","), "carb-lean-idle,carb-rich-flood");
+eq("wizard brakes suggests 1 tree", W.suggest("brakes", "routine", D.trees).length, 1);
+eq("wizard other suggests all 14 trees", W.suggest("other", "routine", D.trees).length, 14);
+eq("wizard unknown area suggests all trees (never empty)", W.suggest("nonsense", "routine", D.trees).length, 14);
+check("wizard roadside puts every critical-cause tree before every non-critical tree",
+  (() => {
+    const list = W.suggest("other", "roadside", D.trees);
+    const rank = (t) => t.causes.some((c) => c.urgency === "critical") ? 0 : 1;
+    return list.every((t, i) => i === 0 || rank(list[i - 1]) <= rank(t));
+  })());
+check("wizard roadside actually reorders (brakes, with critical causes, moves up)",
+  W.suggest("other", "roadside", D.trees)[0].id === "brakes");
+check("wizard routine order is the data order (no reorder)", W.suggest("other", "routine", D.trees)[0].id === D.trees[0].id);
+eq("wizard describe reads back area/when/urgency", W.describe("engine", "idle", "roadside"), "Engine · at idle · Roadside — right now");
+check("index.html has the wizard card (area/when/urgency + go + results)",
+  ["wiz-area", "wiz-when", "wiz-urgency", "wiz-go", "wiz-results"].every((id) => html.includes('id="' + id + '"')));
+check("wizard offers all seven areas", ["engine", "electrical", "chassis", "fuel", "transmission", "brakes", "other"].every((v) => html.includes('value="' + v + '"')));
+check("wizard offers all five whens", ["idle", "speed", "cold", "hot", "always"].every((v) => html.includes('value="' + v + '"')));
+check("wizard offers all three urgencies", ["routine", "soon", "roadside"].every((v) => html.includes('value="' + v + '"')));
+check("app.js wires the wizard and starts the suggested tree with its context",
+  appjs.includes("$(\"wiz-go\")") && appjs.includes("ED_Wizard.suggest") && appjs.includes("startTree(t, wizard)"));
+check("app.js still builds the full tree list directly (wizard never hides a tree)",
+  appjs.includes("D.trees.forEach((t) => {") && appjs.includes("startTree(t)"));
+
+/* --- resumable trees --- */
+check("index.html has the resume banner + abandon button",
+  ["resume-banner", "resume-text", "resume-btn", "resume-discard", "abandon-tree"].every((id) => html.includes('id="' + id + '"')));
+check("app.js saves progress on start and on every answer",
+  appjs.includes("saveProgress();") && appjs.includes("current.step++;\n    saveProgress();"));
+check("app.js clears saved progress when a tree finishes", appjs.includes("clearProgress(); // a finished tree"));
+check("app.js offers Resume and Discard on the banner",
+  appjs.includes("$(\"resume-btn\")") && appjs.includes("$(\"resume-discard\")"));
+check("app.js abandon button clears progress and hides the session",
+  appjs.includes("$(\"abandon-tree\")") && appjs.includes("current = null;\n    clearProgress();"));
+check("import preserves in-progress state", appjs.includes("in_progress: j.in_progress || null"));
+
+/* --- diagnosis history: verdict + delete + per-bike filter --- */
+check("app.js saves the verdict, the top-cause result and the wizard context with the session",
+  appjs.includes("verdict: verdict.text") && appjs.includes("result: top.cause") && appjs.includes("wizard: current.wizard || null"));
+check("app.js deletes an individual history entry and re-renders",
+  appjs.includes("id='hist-delete'") && appjs.includes("state.sessions.splice(viewedHist, 1)"));
+check("app.js filters history by bike", appjs.includes("$(\"history-bike\")") && appjs.includes("r.s.bike === cur"));
+check("index.html has the history bike filter", html.includes('id="history-bike"'));
+check("history detail shows the saved verdict", appjs.includes("s.verdict ? \"<p><b>Safe to ride?</b> \""));
+
+/* --- "Before you start" safety block --- */
+eq("safety block has 5 items", D.safety_block.items.length, 5);
+check("safety block says ignition off", D.safety_block.items.some((i) => i.includes("Ignition OFF")));
+check("safety block says cool engine with the warm-engine exception named",
+  D.safety_block.items.some((i) => i.includes("cool engine") && i.includes("warm")));
+check("safety block says eye protection near the battery",
+  D.safety_block.items.some((i) => i.includes("Eye protection") && i.includes("sulfuric acid")));
+check("safety block says no sparks/flame near fuel or battery",
+  D.safety_block.items.some((i) => i.includes("No sparks or open flame")));
+check("safety block is labeled generic shop safety, not a manual procedure",
+  D.safety_block.note.includes("Generic shop safety") && D.safety_block.note.includes("not a manual procedure"));
+check("safety block names the FSM §8 battery warnings as its manual source",
+  D.safety_block.note.includes("FSM #99482-98 §8"));
+check("app.js renders the safety block into battery, compression and sag cards",
+  (appjs.match(/safetyHtml\(\)/g) || []).length >= 4 && appjs.includes("safetyHtml() +\n    \"<p class='ed-note'>\" + D.charging_tests.intro") && appjs.includes("safetyHtml() +\n    \"<p class='ed-note'>\" + D.compression_tests.intro") && appjs.includes("safetyHtml() +\n    \"<h4>Preload adjustment"));
+check("index.html styles the safety block", html.includes("ed-safety"));
+
+/* --- Sportster numbers (Clymer, batch 2) --- */
+check("every Sportster number source says Clymer",
+  [D.sportster_cv_jetting.source, D.sportster_tire_pressures.source, D.sportster_fork_oil.source].every((s) => s.includes("Clymer")) &&
+  D.torque.clymer.ref.includes("Clymer"));
+eq("CV jetting covers all four markets", Object.keys(D.sportster_cv_jetting).filter((k) => ["usExceptCalifornia", "california", "hdi", "swiss"].includes(k)).length, 4);
+eq("US 1988 main jets are 883: 170 / 1200: 200",
+  D.sportster_cv_jetting.usExceptCalifornia.main[0].m883 + "/" + D.sportster_cv_jetting.usExceptCalifornia.main[0].m1200, "170/200");
+eq("US 1998-2003 1200S main jet is 195", D.sportster_cv_jetting.usExceptCalifornia.main[5].m1200S, 195);
+eq("California 1988 main jets are 883: 165 / 1200: 180",
+  D.sportster_cv_jetting.california.main[0].m883 + "/" + D.sportster_cv_jetting.california.main[0].m1200, "165/180");
+eq("HDI 1999-2003 main jets are 190 / 200",
+  D.sportster_cv_jetting.hdi.main[3].m883 + "/" + D.sportster_cv_jetting.hdi.main[3].m1200, "190/200");
+eq("US pilot jet 1996-2003 is 42", D.sportster_cv_jetting.usExceptCalifornia.pilot[3].m883, 42);
+eq("float height 1988-1991 is 0.725-0.730 in", D.sportster_cv_jetting.floatHeight[0].value, "0.725–0.730 in (18.4–18.5 mm)");
+eq("float height 1992-2003 is 0.413-0.453 in", D.sportster_cv_jetting.floatHeight[1].value, "0.413–0.453 in (10.5–11.5 mm)");
+eq("Sportster 1200 tire pressure up to 300 lb is 30 front / 36 rear",
+  D.sportster_tire_pressures.upTo300lb.front[0].psi + "/" + D.sportster_tire_pressures.upTo300lb.rear[0].psi, "30/36");
+eq("Sportster 1200 rear at GVWR is 40 psi", D.sportster_tire_pressures.upToGVWR.rear[0].psi, 40);
+eq("Sportster 883 1986-1990 front is 26 psi", D.sportster_tire_pressures.upTo300lb.front[1].psi, 26);
+eq("Sportster fork oil has 5 year rows", D.sportster_fork_oil.rows.length, 5);
+eq("1986-1987 fork oil is 5.4 wet / 6.4 dry oz",
+  D.sportster_fork_oil.rows[0].wetOz + "/" + D.sportster_fork_oil.rows[0].dryOz, "5.4/6.4");
+eq("1992-1998 883 Hugger fork oil is 10.7 wet / 12.1 dry oz",
+  D.sportster_fork_oil.rows[2].wetOz + "/" + D.sportster_fork_oil.rows[2].dryOz, "10.7/12.1");
+eq("1999-2003 fork oil is 9.0 wet / 10.2 dry oz",
+  D.sportster_fork_oil.rows[4].wetOz + "/" + D.sportster_fork_oil.rows[4].dryOz, "9/10.2");
+const clymerChapter = D.torque.clymer;
+check("Clymer Sportster chapter present", !!clymerChapter);
+eq("Clymer chapter has 29 rows (15 Table 7 + 7 Table 8 + 7 Table 9)", clymerChapter.rows.length, 29);
+check("Clymer chapter ref says aftermarket, never factory",
+  clymerChapter.ref.includes("AFTERMARKET") && clymerChapter.ref.includes("never factory"));
+check("Table 9 spark plug row was NOT duplicated into the Clymer chapter (factory chapter already has it)",
+  !clymerChapter.rows.some((r) => r.fastener === "Spark plug") &&
+  clymerChapter.rows.filter((r) => r.fastener.startsWith("Spark plugs")).length === 1);
+check("1986-1987 fast idle carries the print quirk verbatim with its flag",
+  clymerChapter.rows.some((r) => r.fastener.includes("fast idle") && r.value.includes("1500–1500 rpm (as printed)") && r.value.includes("likely a misprint, unverified")));
+check("Clymer chapter carries the Table 8 VOES timing rows",
+  clymerChapter.rows.some((r) => r.fastener.includes("1986–1994, fast idle") && r.value.includes("40° BTDC")) &&
+  clymerChapter.rows.some((r) => r.fastener.includes("2001–2003 1200S") && r.value.includes("15° BTDC")));
+check("Clymer chapter carries the Table 9 rear axle nut + drain plug",
+  clymerChapter.rows.some((r) => r.fastener.includes("Rear axle nut") && r.value.includes("60–65 ft-lbs")) &&
+  clymerChapter.rows.some((r) => r.fastener.includes("drain plug") && r.value.includes("14–21 ft-lbs")));
+check("factory Sportster chapter still has exactly its 2 rows",
+  D.torque.chapters.find((c) => c.title === "Sportster (1986–2003)").slugs.length === 2);
+check("index.html has the three Sportster cards",
+  ["sportster-jetting", "sportster-tires", "sportster-fork-oil"].every((id) => html.includes('id="' + id + '"')));
+check("app.js renders all three Sportster cards",
+  ["sportster-jetting", "sportster-tires", "sportster-fork-oil"].every((id) => appjs.includes("$(\"" + id + "\")")));
+check("app.js labels the Sportster cards Clymer, never a correction to Softail numbers",
+  appjs.includes("never a correction to the Softail CV40 numbers") && appjs.includes("Clymer (aftermarket). Sportster only"));
 
 console.log(pass + "/" + (pass + fail) + " tests passed");
 if (fail) process.exit(1);

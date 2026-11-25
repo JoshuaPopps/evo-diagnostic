@@ -46,6 +46,8 @@
   .ed-bar-row .ed-bar-label{flex:0 0 45%}
   .ed-bar-row .ed-bar-track{flex:1;height:10px;background:#222;border-radius:5px;overflow:hidden}
   .ed-bar-row .ed-bar-track>div{height:100%;background:var(--purple,#9d6bff)}
+  .ed-safety{border-left:4px solid #f5a524;padding:8px 10px;margin:8px 0;background:#1a1a10}
+  .ed-safety b{color:#ffe1a1}
   /* House buttons jump 2px on :hover — on a touch-first app that shift sticks after a tap and looks broken. Hold our buttons still. */
   .ed-btn:hover, .ed-tree-btn:hover, .ed-tab:hover { transform: none !important; }
 </style>
@@ -72,6 +74,42 @@
   </nav>
 
   <section class="ed-panel active" id="panel-diagnose">
+    <div class="ed-card" id="wizard-card">
+      <h3>What is it doing?</h3>
+      <p class="ed-note">Three quick questions narrow the trees to the ones that fit. Or skip it and tap any tree below — every tree stays directly accessible.</p>
+      <label for="wiz-area">Where on the bike?</label>
+      <select id="wiz-area">
+        <option value="engine">Engine</option>
+        <option value="electrical">Electrical</option>
+        <option value="chassis">Chassis</option>
+        <option value="fuel">Fuel / carb</option>
+        <option value="transmission">Transmission</option>
+        <option value="brakes">Brakes</option>
+        <option value="other">Somewhere else</option>
+      </select>
+      <label for="wiz-when">When does it happen?</label>
+      <select id="wiz-when">
+        <option value="idle">At idle</option>
+        <option value="speed">At speed</option>
+        <option value="cold">On a cold start</option>
+        <option value="hot">On a hot engine</option>
+        <option value="always">Always</option>
+      </select>
+      <label for="wiz-urgency">How urgent?</label>
+      <select id="wiz-urgency">
+        <option value="routine">Routine — fix when convenient</option>
+        <option value="soon">Soon — fix before a real ride</option>
+        <option value="roadside">Roadside — right now</option>
+      </select>
+      <button class="ed-btn" id="wiz-go">Suggest trees</button>
+      <div id="wiz-results"></div>
+    </div>
+    <div class="ed-card" id="resume-banner" style="display:none">
+      <h3>Unfinished diagnosis</h3>
+      <p class="ed-note" id="resume-text"></p>
+      <button class="ed-btn" id="resume-btn">Resume</button>
+      <button class="ed-btn ghost" id="resume-discard">Discard it</button>
+    </div>
     <div id="tree-list"></div>
     <div id="session" style="display:none">
       <div class="ed-card">
@@ -81,6 +119,7 @@
         <input type="file" id="photo" accept="image/*" capture="environment">
         <div id="photo-preview"></div>
         <div id="tree-step"></div>
+        <button class="ed-btn ghost" id="abandon-tree">Stop &amp; discard progress</button>
       </div>
       <div class="ed-card" id="results" style="display:none"></div>
     </div>
@@ -385,6 +424,21 @@
       <h3>Dimensions &amp; weights</h3>
       <div id="torque-dims"></div>
     </div>
+    <div class="ed-card">
+      <h3>Sportster CV jetting — Clymer (aftermarket)</h3>
+      <p class="ed-note">Sportster 1986–2003 only, CV40 carburetor. Every value is Clymer — never factory, never a correction to the Softail numbers. The 1200S has its own main jet in the 1998–2003 rows.</p>
+      <div id="sportster-jetting"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Sportster tire pressures — Clymer (aftermarket)</h3>
+      <p class="ed-note">Sportster 1986–2003 only, cold pressures, original-equipment tires. Every value is Clymer — never factory, never a correction to the Softail pressures above.</p>
+      <div id="sportster-tires"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Sportster fork oil — Clymer (aftermarket)</h3>
+      <p class="ed-note">Sportster 1986–2003 only, per leg. Every value is Clymer — never factory. Wet = after a drain; dry = after a full disassembly.</p>
+      <div id="sportster-fork-oil"></div>
+    </div>
   </section>
 
   <section class="ed-panel" id="panel-shop">
@@ -455,7 +509,9 @@
     </div>
     <div class="ed-card">
       <h3>Past diagnoses</h3>
-      <p class="ed-note">Every session you save lands here. Tap one to reopen its answers and ranked causes.</p>
+      <p class="ed-note">Every session you save lands here, newest first — one entry per finished diagnosis, never overwritten. Tap one to reopen its answers, verdict and ranked causes; delete one from its detail view.</p>
+      <label for="history-bike">Show diagnoses for</label>
+      <select id="history-bike"></select>
       <div id="history-list"></div>
       <div id="history-detail"></div>
     </div>
@@ -473,7 +529,10 @@
 <script src="shop.js"></script>
 <script src="nhtsa.js"></script>
 <script src="handoff.js"></script>
+<script src="wizard.js"></script>
+<script src="report.js"></script>
 <script src="sw-update.js"></script>
+<script src="pg-parts-core.js"></script>
 <script src="app.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
