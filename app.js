@@ -55,6 +55,21 @@
   renderBikeSel();
   bikeSel.addEventListener("change", () => { state.bike = bikeSel.value; store.save(state); renderCarbs(); });
 
+  /* ---------- year-gating (round 3): the picked bike's year narrows the
+     year splits in the speedometer and turn-signal trees (gating.js).
+     No bike picked, a bike with no year in its name, or a year the tree
+     does not cover (1990, 1947) shows everything, as before. Guarded
+     like PartsCore: if the module failed to load, nothing is gated. */
+  const Gating = (typeof ED_Gating !== "undefined") ? ED_Gating : null;
+  function currentBike() { return allBikes().find((b) => b.id === state.bike) || null; }
+  function currentBikeYear() { const b = currentBike(); return (Gating && b) ? Gating.bikeYear(b) : null; }
+  function gateNoteHtml(hidden) {
+    const b = currentBike(); const y = currentBikeYear();
+    return (hidden && b && y)
+      ? "<p class='ed-note'>Showing only the " + y + " checks for your " + b.name + " — other model years hidden.</p>"
+      : "";
+  }
+
   /* ---------- add a bike (any rider) ---------- */
   const addModelSel = $("add-bike-model");
   const blank = document.createElement("option");
@@ -193,8 +208,12 @@
     const t = current.tree, el = $("tree-step");
     if (current.step >= t.steps.length) return finishTree();
     const s = t.steps[current.step];
-    el.innerHTML = "<p><b>Step " + (current.step + 1) + " of " + t.steps.length + ":</b> " + s.q + "</p>" +
-      "<p class='ed-note'>" + s.note + " <i>Source: " + s.cite + "</i></p>" +
+    const year = currentBikeYear();
+    const gq = Gating ? Gating.gateTreeText(t.id, t, s.q, year) : { text: s.q, hidden: false };
+    const gn = Gating ? Gating.gateTreeText(t.id, t, s.note, year) : { text: s.note, hidden: false };
+    el.innerHTML = "<p><b>Step " + (current.step + 1) + " of " + t.steps.length + ":</b> " + gq.text + "</p>" +
+      gateNoteHtml(gq.hidden || gn.hidden) +
+      "<p class='ed-note'>" + gn.text + " <i>Source: " + s.cite + "</i></p>" +
       "<button class='ed-btn' id='ans-yes'>Yes</button>" +
       "<button class='ed-btn ghost' id='ans-no'>No</button>";
     $("ans-yes").addEventListener("click", () => answer(true));
@@ -263,14 +282,22 @@
         ? { cls: "soon", text: "Fix before a real ride — " + top.cause + ". " + top.ride }
         : { cls: "ok", text: "Likely rideable — " + top.cause + ". " + top.ride };
     const total = ranked.reduce((s, c) => s + c.score, 0) || 1;
+    /* Year-gating (round 3): the picked bike's year narrows the year
+       splits in the cause tests of the two gated trees. The shared
+       report and the saved session keep the full ungated text — the
+       report is the record; the screen is the walk. */
+    const year = currentBikeYear();
+    const gated = ranked.map((c) => Gating ? Gating.gateTreeText(t.id, t, c.test, year) : { text: c.test, hidden: false });
+    const anyGated = gated.some((g) => g.hidden);
     let html = "<h3>Ranked likely causes</h3>" +
       "<p class='ed-note'>Ranked by the checks you just ran. Every cause names its confirming test — run it before buying parts. Confidence is a share of the weight from your answers, not a measurement. NHTSA counts, where shown, are owner complaints filed for the cause's whole component family — not for that exact fault.</p>" +
-      "<div class='ed-verdict " + verdict.cls + "'>Safe to ride? " + verdict.text + "</div>";
-    ranked.forEach((c) => {
+      "<div class='ed-verdict " + verdict.cls + "'>Safe to ride? " + verdict.text + "</div>" +
+      gateNoteHtml(anyGated);
+    ranked.forEach((c, i) => {
       const pct = Math.round((c.score / total) * 100);
       const nhtsa = bundle ? ED_NHTSA.complaintForCause(bundle.complaint_counts_by_component, t.system, c.cause) : null;
       html += "<div class='ed-cause " + c.urgency + "'><b>" + c.cause + "</b> — " + pct + "%" +
-        "<br>Confirming test: " + c.test +
+        "<br>Confirming test: " + gated[i].text +
         "<br>Fix: " + c.fix +
         (c.source ? "<br><span class='ed-note'>Source: " + c.source + "</span>" : "") +
         (nhtsa ? "<br><span class='ed-note'>NHTSA: " + ED_NHTSA.complaintLabel(nhtsa) + " — of " + bundle.complaint_total + " owner complaints in the bundle.</span>" : "") +
@@ -375,8 +402,12 @@
   });
 
   /* ---------- atlas ---------- */
+  /* Round 3 (Nov 25, 2026): the Softail still used to appear twice — a
+     thumbnail in this grid and the large tappable map below. The map
+     stays (it is the interactive surface); photos flagged in_photo_map
+     are skipped here, so each own photo appears once. */
   const grid = $("cc-grid");
-  (D.own_photos || []).forEach((p) => {
+  (D.own_photos || []).filter((p) => !p.in_photo_map).forEach((p) => {
     const d = document.createElement("div");
     d.innerHTML = "<img class='ed-thumb' src='" + p.file + "' alt='" + p.subject + "' loading='lazy'>" +
       "<p><b>" + p.subject + "</b><br><span class='ed-credit'>" + p.credit + "</span></p>";
@@ -471,7 +502,10 @@
     $("quick-status").textContent = "Listening for 10 seconds — hold still near the exhaust…";
     $("quick-results").innerHTML = "";
     const samples = [];
-    ED_Audio.start((rpm) => { if (rpm != null) samples.push(rpm); }, (err) => { $("quick-status").textContent = err; });
+    const specFrames = [];
+    let specSr = 0, specFft = 0;
+    ED_Audio.start((rpm) => { if (rpm != null) samples.push(rpm); }, (err) => { $("quick-status").textContent = err; },
+      (frame, sr, fft) => { specFrames.push(frame); specSr = sr; specFft = fft; });
     setTimeout(() => {
       ED_Audio.stop();
       if (!samples.length) { $("quick-status").textContent = "No clear pulse in 10 seconds. Try again closer to the exhaust."; return; }
@@ -485,13 +519,80 @@
       if (v === "high") hints.push({ s: "Intake leak or stuck enrichener", test: "Carb-cleaner spray test at the seals" });
       hints.push({ s: "Lifter tick (half engine speed)", test: "Check lifter bleed-down and oil" });
       $("quick-status").textContent = "RPM " + avg + " (stability ±" + sd + " rpm) — " + (stable ? "steady idle" : "uneven idle") + ".";
+      const nowBands = ED_Audio.spectrumToBands(ED_Audio.averageSpectrum(specFrames), specSr, specFft);
       const base = state.baselines[state.bike];
-      const cmp = base ? ED_Audio.compareBaseline({ rpm: avg, sd }, base) : null;
+      const cmp = base ? ED_Audio.compareBaseline({ rpm: avg, sd, spectrum: nowBands }, base) : null;
       $("quick-results").innerHTML = "<h3>Top likely sounds</h3><p class='ed-note'>Hints from 10 seconds of sound, never a verdict. Each names its confirming test.</p>" +
         (cmp ? "<div class='ed-verdict " + (cmp.verdict === "close" ? "ok" : "soon") + "'>vs your baseline: " + (cmp.rpmDelta >= 0 ? "+" : "") + cmp.rpmDelta + " rpm" + (cmp.sdDelta != null ? ", stability " + (cmp.sdDelta >= 0 ? "+" : "") + cmp.sdDelta : "") + " — " + cmp.text + "</div>" : "<p class='ed-note'>No baseline for this bike yet — save one in Healthy baselines and future listens compare against it.</p>") +
+        spectrumHtml(cmp, base, nowBands) +
         hints.slice(0, 3).map((h, i) => "<div class='ed-cause'><b>" + (i + 1) + ". " + h.s + "</b><br>Confirming test: " + h.test + "</div>").join("");
+      wireSpectrumTreeButtons($("quick-results"));
     }, 10000);
   });
+
+  /* ---------- spectrum comparison display ----------
+     Which diagnostic tree a changed band genuinely points at. A band
+     with no entry has no tree in this app — the UI says so rather than
+     stretching one. Sound never asserts a cause; the tree does the
+     confirming, with its own tests. */
+  const SPECTRUM_TREE_LINKS = {
+    rumble: "engine-noise",
+    lowmid: "engine-noise",
+    mid: "primary-drive",
+    uppermid: "engine-noise",
+    tick: "engine-noise",
+    hiss: "engine-noise"
+  };
+  function fmtFreq(hz) { return hz >= 1000 ? (hz / 1000) + "k" : String(hz); }
+  function spectrumChartSvg(bands) {
+    const BOT = 150, TOP = 8, MIN = -90, MAX = -30;
+    const h = (db) => Math.max(0, Math.min(1, (db - MIN) / (MAX - MIN))) * (BOT - TOP);
+    let s = "<svg viewBox='0 0 560 190' style='width:100%;height:auto;display:block;background:#0d0d10;border:1px solid #333;border-radius:8px' role='img' aria-label='Spectrum chart: baseline vs now, per frequency band'>";
+    [-90, -60, -30].forEach((db) => {
+      const y = BOT - h(db);
+      s += "<line x1='0' y1='" + y + "' x2='560' y2='" + y + "' stroke='#333' stroke-width='1'/><text x='4' y='" + (y - 3) + "' fill='#999' font-size='10'>" + db + " dB</text>";
+    });
+    bands.forEach((b, i) => {
+      const x = 8 + i * 69;
+      const hb = h(b.base), hn = h(b.now);
+      s += "<rect x='" + x + "' y='" + (BOT - hb) + "' width='26' height='" + hb + "' fill='#9d6bff'/>";
+      s += "<rect x='" + (x + 30) + "' y='" + (BOT - hn) + "' width='26' height='" + hn + "' fill='#d9d9e0'/>";
+      s += "<text x='" + (x + 28) + "' y='164' fill='#bbb' font-size='10' text-anchor='middle'>" + b.label + "</text>";
+      s += "<text x='" + (x + 28) + "' y='177' fill='#888' font-size='9' text-anchor='middle'>" + fmtFreq(b.lo) + "–" + fmtFreq(b.hi) + " Hz</text>";
+    });
+    return s + "</svg>";
+  }
+  function spectrumHtml(cmp, base, nowBands) {
+    if (!base) return "";
+    if (!base.spectrum) return "<h3>Sound spectrum vs baseline</h3><p class='ed-note'>This baseline has no spectrum stored yet — it was saved before spectrum capture, or the capture had no frequency data. Re-save it in Healthy baselines and future listens compare the sound itself, not just RPM.</p>";
+    if (!cmp || !cmp.spectrum) return "<h3>Sound spectrum vs baseline</h3><p class='ed-note'>The stored spectrum uses an older band layout — re-save the baseline in Healthy baselines to compare spectra again.</p>";
+    if (!nowBands) return "<h3>Sound spectrum vs baseline</h3><p class='ed-note'>No spectrum captured this listen — the frequency data came back empty. The RPM comparison above still stands.</p>";
+    const spec = cmp.spectrum;
+    const unchanged = spec.bands.filter((b) => !b.changed).map((b) => b.label).join(", ");
+    let html = "<h3>Sound spectrum vs baseline</h3>" +
+      "<p class='ed-note'>Spectrum comparison is not yet validated against real recordings — it is proven on synthetic test tones only. It shows WHERE the sound changed, never what caused it.</p>" +
+      spectrumChartSvg(spec.bands) +
+      "<p class='ed-note'><span style='color:#9d6bff'>&#9632;</span> baseline &nbsp; <span style='color:#d9d9e0'>&#9632;</span> now &nbsp;·&nbsp; a band counts as changed at ±6 dB or more</p>";
+    spec.bands.filter((b) => b.changed).forEach((b) => {
+      const treeId = SPECTRUM_TREE_LINKS[b.id];
+      const tree = treeId ? D.trees.find((t) => t.id === treeId) : null;
+      let note;
+      if (b.id === "air") note = "Air is the wind / mic-noise control band — if only this band moved, suspect wind, not the engine. No tree maps to it.";
+      else if (!tree) note = "No tree in this app maps to this band alone — the RPM comparison above is the read that matters here.";
+      else note = "A change " + (b.delta > 0 ? "up here" : "down here") + " is the kind of thing the " + tree.title + " covers — run it.";
+      html += "<div class='ed-safety'><b>" + b.label + " (" + fmtFreq(b.lo) + "–" + fmtFreq(b.hi) + " Hz): " + (b.delta >= 0 ? "+" : "") + b.delta + " dB</b> — " + b.base + " dB baseline, " + b.now + " dB now. " + b.lives + ".<br>" + note +
+        (tree ? "<br><button class='ed-btn ghost' data-spectrum-tree='" + tree.id + "'>Run the " + tree.title + "</button>" : "") + "</div>";
+    });
+    if (!spec.changed.length) html += "<p class='ed-note'>No band moved more than ±6 dB — the sound itself matches your baseline.</p>";
+    else if (unchanged) html += "<p class='ed-note'>No change (±6 dB or less) in: " + unchanged + ".</p>";
+    return html;
+  }
+  function wireSpectrumTreeButtons(el) {
+    el.querySelectorAll("[data-spectrum-tree]").forEach((btn) => btn.addEventListener("click", () => {
+      const t = D.trees.find((x) => x.id === btn.dataset.spectrumTree);
+      if (t) startTree(t);
+    }));
+  }
 
   /* ---------- video: 10-second clips ---------- */
   $("clip-record").addEventListener("click", () => {
@@ -530,13 +631,18 @@
   $("baseline-save").addEventListener("click", () => {
     $("baseline-list").innerHTML = "<p class='ed-note'>Recording 10 seconds of idle…</p>";
     const samples = [];
-    ED_Audio.start((rpm) => { if (rpm != null) samples.push(rpm); }, (err) => { $("baseline-list").textContent = err; });
+    const specFrames = [];
+    let specSr = 0, specFft = 0;
+    ED_Audio.start((rpm) => { if (rpm != null) samples.push(rpm); }, (err) => { $("baseline-list").textContent = err; },
+      (frame, sr, fft) => { specFrames.push(frame); specSr = sr; specFft = fft; });
     setTimeout(() => {
       ED_Audio.stop();
       if (!samples.length) { $("baseline-list").innerHTML = "<p class='ed-note'>No clear pulse. Try again closer to the exhaust.</p>"; return; }
       const avg = Math.round(samples.reduce((a, b) => a + b, 0) / samples.length);
       const sd = Math.round(Math.sqrt(samples.reduce((a, b) => a + (b - avg) * (b - avg), 0) / samples.length));
+      const spectrum = ED_Audio.spectrumToBands(ED_Audio.averageSpectrum(specFrames), specSr, specFft);
       state.baselines[state.bike] = { rpm: avg, sd, when: new Date().toISOString() };
+      if (spectrum) { state.baselines[state.bike].spectrum = spectrum; state.baselines[state.bike].spectrumVersion = ED_Audio.SPECTRUM_VERSION; }
       store.save(state);
       renderBaselines();
     }, 10000);
@@ -545,7 +651,8 @@
     const el = $("baseline-list");
     const rows = Object.entries(state.baselines).map(([bid, b]) => {
       const bike = allBikes().find((x) => x.id === bid);
-      return "<p>" + (bike ? bike.name : bid) + ": " + b.rpm + " rpm" + (b.sd != null ? " (±" + b.sd + ")" : "") + ", recorded " + new Date(b.when).toLocaleDateString() + "</p>";
+      return "<p>" + (bike ? bike.name : bid) + ": " + b.rpm + " rpm" + (b.sd != null ? " (±" + b.sd + ")" : "") + ", recorded " + new Date(b.when).toLocaleDateString() +
+        (b.spectrum ? " · spectrum stored" : " · no spectrum yet — re-save to add one") + "</p>";
     });
     el.innerHTML = rows.length ? rows.join("") : "<p class='ed-note'>No baselines yet.</p>";
   }
@@ -640,9 +747,18 @@
     "<p>" + D.sportster_fork_oil.note + " <i>Source: " + D.sportster_fork_oil.source + "</i></p>" +
     D.sportster_fork_oil.rows.map((r) => "<div class='ed-cause'><b>" + r.years + "</b><br>Wet: " + r.wetOz + " oz (" + r.wetMl + " ml) · Dry: " + r.dryOz + " oz (" + r.dryMl + " ml)</div>").join("") +
     "<p class='ed-note'>Source: " + D.sportster_fork_oil.source + " — Clymer (aftermarket). Sportster only.</p>";
+  $("knucklehead-tires").innerHTML =
+    "<p>" + D.knucklehead_tire_pressures.note + " <i>Source: " + D.knucklehead_tire_pressures.source + "</i></p>" +
+    D.knucklehead_tire_pressures.rows.map((r) =>
+      "<div class='ed-cause'><b>" + r.load + "</b><br>" + r.tire + ": front <b>" + r.front + " lbs.</b> · rear <b>" + r.rear + " lbs.</b>" +
+      (r.sidecar !== null ? " · sidecar <b>" + r.sidecar + " lbs.</b>" : "") +
+      (r.packageTruck !== null ? " · package truck <b>" + r.packageTruck + " lbs.</b>" : "") + "</div>").join("") +
+    "<p class='ed-note'>Source: " + D.knucklehead_tire_pressures.source + " — Knucklehead only; never a correction to the Softail or Sportster pressures.</p>";
 
   /* ---------- shop tab: plug reader, wire/fuse, gear ratio, tap & drill,
-     bolt ID, oil, compression ratio, carb CFM, sag, interchange, pre-ride.
+     bolt ID, oil, compression ratio, carb CFM, sag, interchange, pre-ride,
+     tire reader, unit converter, belt, clutch, primary chain, storage,
+     brake pads, fork oil, first 500-mile service.
      All reference numbers live in ED_DATA.shop; all math in ED_Shop. --- */
   const SH = D.shop;
   /* 1. Plug reader */
@@ -837,6 +953,236 @@
       (g.sub_items ? "<p><b>" + g.sub_title + "</b></p>" + g.sub_items.map((it) => "<p><label style='font-weight:400'><input type='checkbox' style='width:auto;margin-right:8px'> " + it + "</label></p>").join("") + "<p class='ed-note'>Source: " + g.sub_source + "</p>" : "") +
       "<p class='ed-note'>Source: " + g.source + "</p></div>").join("") +
     "<p class='ed-note'>Source: " + SH.preride.ref + "</p>";
+  /* 12. Tire reader — decode the sidewall, then the DOT date */
+  $("tire-reader").innerHTML =
+    "<label for='tr-sidewall'>Sidewall marking (size + service description)</label><input type='text' id='tr-sidewall' inputmode='text' placeholder='e.g. 130/90-16 M/C 67H or MT90-16 74H' value='130/90-16 M/C 67H'>" +
+    "<label for='tr-dot'>DOT date code (last 3 or 4 digits of the TIN)</label><input type='text' id='tr-dot' inputmode='numeric' placeholder='e.g. 5107'>" +
+    "<div id='tr-result'></div>" +
+    "<h4>Alpha to metric (approximate)</h4>" +
+    SH.tire_reader.alpha.map((r) => "<div class='ed-cause'><b>" + r.alpha + "</b> — about " + r.metric + " (" + r.inch + " in)" + (r.note ? "<br><span class='ed-note'>" + r.note + "</span>" : "") + "</div>").join("") +
+    SH.tire_reader.notes.map((n) => "<p class='ed-note'>" + n + "</p>").join("") +
+    "<p class='ed-note'>Source: " + SH.tire_reader.ref + "</p>";
+  function renderTireReader() {
+    const size = ED_Shop.tireSizeDecode($("tr-sidewall").value, SH.tire_reader.alpha);
+    const svc = ED_Shop.tireServiceDecode($("tr-sidewall").value, SH.tire_reader.load_index, SH.tire_reader.speed_rating);
+    let html = "";
+    if (size.error) {
+      html = "<p>" + size.error + "</p>";
+    } else {
+      html = "<div class='ed-cause'>";
+      if (size.system === "metric") {
+        html += "<b>" + size.size_text + "</b> — metric: " + size.width_mm + " mm wide, sidewall " + size.aspect + "% of the width (" + Math.round(size.width_mm * size.aspect / 100) + " mm), " + size.construction + ", " + size.rim_in + " in rim.";
+      } else if (size.system === "alpha") {
+        html += "<b>" + size.size_text + "</b> — alpha-numeric: width code " + size.alpha + (size.metric_equiv ? ", about " + size.metric_equiv + " metric" : " (no conversion row in the table)") + ", aspect " + size.aspect + "%, " + size.construction + ", " + size.rim_in + " in rim.";
+        if (size.metric_note) html += "<br><span class='ed-note'>" + size.metric_note + "</span>";
+      } else {
+        html += "<b>" + size.size_text + "</b> — inch size: " + size.width_in.toFixed(2) + " in (" + size.width_mm + " mm) wide, " + size.construction + ", " + size.rim_in + " in rim. No aspect ratio is printed on inch sizes.";
+      }
+      if (size.speed_prefix === "Z") html += "<br>Z in the size means rated over 149 mph — the service description after the size gives the actual limit.";
+      if (svc.load) html += "<br>Load index <b>" + svc.load_index + "</b> = <b>" + svc.load.kg + " kg (" + svc.load.lb + " lb)</b> per tire, at the maker's specified pressure.";
+      else if (svc.load_index !== null) html += "<br>Load index " + svc.load_index + " is outside the LI 40-91 table in the library — check the tire maker's chart.";
+      if (svc.speed) html += "<br>Speed rating <b>" + svc.speed.symbol + "</b> = max sustained <b>" + svc.speed.kmh + " km/h (" + svc.speed.mph + " mph)</b> at rated load and correct inflation.";
+      html += "</div>";
+    }
+    const dot = $("tr-dot").value.trim();
+    if (dot) {
+      const d = ED_Tire.decode(dot, new Date());
+      if (d.error) html += "<p>" + d.error + "</p>";
+      else {
+        const cls = d.verdict === "green" ? "ok" : d.verdict === "amber" ? "soon" : "no";
+        html += "<div class='ed-verdict " + cls + "'>" + d.text + "</div><p>" + d.note + " Age about " + d.age + " years.</p>";
+      }
+    }
+    $("tr-result").innerHTML = html;
+  }
+  ["tr-sidewall", "tr-dot"].forEach((id) => $(id).addEventListener("input", renderTireReader));
+  renderTireReader();
+  /* 13. Unit converter — standard definitions, not manual specs */
+  const UC = SH.unit_converter;
+  $("unit-converter").innerHTML =
+    "<label for='uc-cat'>What are you converting?</label><select id='uc-cat'>" +
+    UC.categories.map((c) => "<option value='" + c.id + "'>" + c.label + "</option>").join("") + "</select>" +
+    "<label for='uc-value'>Value</label><input type='text' id='uc-value' inputmode='decimal' value='1'>" +
+    "<label for='uc-from'>From</label><select id='uc-from'></select>" +
+    "<label for='uc-to'>To</label><select id='uc-to'></select>" +
+    "<div id='uc-result'></div>" +
+    UC.notes.map((n) => "<p class='ed-note'>" + n + "</p>").join("") +
+    "<p class='ed-note'>Source: " + UC.ref + "</p>";
+  function renderUcUnits() {
+    const cat = UC.categories.find((c) => c.id === $("uc-cat").value) || UC.categories[0];
+    $("uc-from").innerHTML = cat.units.map((u) => "<option value='" + u.code + "'>" + u.label + " (" + u.code + ")</option>").join("");
+    $("uc-to").innerHTML = cat.units.map((u) => "<option value='" + u.code + "'>" + u.label + " (" + u.code + ")</option>").join("");
+    /* Sensible defaults: torque starts ft-lb -> N·m, the shop's commonest ask. */
+    if (cat.id === "torque") { $("uc-from").value = "ftlb"; $("uc-to").value = "Nm"; }
+    if (cat.id === "length") { $("uc-from").value = "in"; $("uc-to").value = "mm"; }
+    if (cat.id === "pressure") { $("uc-from").value = "psi"; $("uc-to").value = "kPa"; }
+    if (cat.id === "volume") { $("uc-from").value = "qt"; $("uc-to").value = "mL"; }
+    renderUc();
+  }
+  function renderUc() {
+    const cat = UC.categories.find((c) => c.id === $("uc-cat").value) || UC.categories[0];
+    const v = parseFloat($("uc-value").value);
+    const out = ED_Shop.unitConvert(v, $("uc-from").value, $("uc-to").value, cat.units);
+    $("uc-result").innerHTML = out === null ? "<p>Enter a value and pick two units.</p>"
+      : "<div class='ed-cause'><b>" + v + " " + $("uc-from").value + " = " + (Math.round(out * 10000) / 10000) + " " + $("uc-to").value + "</b></div>";
+  }
+  ["uc-cat"].forEach((id) => $(id).addEventListener("change", renderUcUnits));
+  ["uc-value"].forEach((id) => $(id).addEventListener("input", renderUc));
+  ["uc-from", "uc-to"].forEach((id) => $(id).addEventListener("change", renderUc));
+  renderUcUnits();
+  /* 14. Drive belt — FSM §1 pp. 1-43–1-44, guided procedure */
+  $("belt-adjust").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.belt.interval + "</p>" +
+    "<p><b>Spec:</b> " + SH.belt.spec + "</p>" +
+    SH.belt.conditions.map((c) => "<p class='ed-note'>• " + c + "</p>").join("") +
+    "<ol>" + SH.belt.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.belt.caution + "</p>" +
+    "<p class='ed-note'>Source: " + SH.belt.ref + "</p>";
+  /* 15. Clutch adjustment — FSM §1 p. 1-40, guided procedure */
+  $("clutch-adjust").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.clutch.interval + "</p>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.clutch.caution + "</p>" +
+    "<ol>" + SH.clutch.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>" + SH.clutch.note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.clutch.ref + "</p>";
+  /* 16. Primary chain — FSM §1 pp. 1-38–1-39, guided procedure */
+  $("primary-chain").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.primary_chain.interval + "</p>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.primary_chain.warning + "</p>" +
+    "<p><b>Spec:</b> " + SH.primary_chain.spec + "</p>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.primary_chain.caution + "</p>" +
+    "<ol>" + SH.primary_chain.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>" + SH.primary_chain.figure_note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.primary_chain.ref + "</p>";
+  /* 17. Storage — FSM §1 p. 1-8, both directions */
+  $("storage").innerHTML =
+    safetyHtml() +
+    "<p>" + SH.storage.intro + "</p>" +
+    "<p class='ed-note'>" + SH.storage.dealer_note + "</p>" +
+    SH.storage.warnings.map((w) => "<p class='ed-note'><b>Warning:</b> " + w + "</p>").join("") +
+    "<h4>Putting it away</h4>" +
+    "<ol>" + SH.storage.put_away.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Removal from storage</h4>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.storage.removal_warning + "</p>" +
+    "<ol>" + SH.storage.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>Source: " + SH.storage.ref + "</p>";
+  /* 18. Brake pad replacement — FSM §2 pp. 2-40–2-43 (front), 2-47–2-48 (rear) */
+  $("brake-pads").innerHTML =
+    safetyHtml() +
+    "<p><b>Wear limit:</b> " + SH.brake_pads.wear_limit + "</p>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.brake_pads.sets_rule + "</p>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.brake_pads.pump_caution + "</p>" +
+    "<h4>Front caliper</h4>" +
+    "<ol>" + SH.brake_pads.front.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>" + SH.brake_pads.front.piston_note + "</p>" +
+    "<h4>Rear caliper</h4>" +
+    "<ol>" + SH.brake_pads.rear.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>" + SH.brake_pads.rear.piston_note + "</p>" +
+    "<p class='ed-note'><b>Burnish — the manual prints two distances:</b> " + SH.brake_pads.burnish_note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.brake_pads.ref + "</p>";
+  /* 19. Fork oil change — FSM §1 p. 1-42 */
+  $("fork-oil").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.fork_oil.interval + "</p>" +
+    "<p><b>Fluid:</b> " + SH.fork_oil.fluid + "</p>" +
+    "<ol>" + SH.fork_oil.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p><b>Capacities (wet):</b></p>" +
+    SH.fork_oil.capacities.map((c) => "<p>" + c.models + " — " + c.wet + "</p>").join("") +
+    "<p class='ed-note'>" + SH.fork_oil.note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.fork_oil.ref + "</p>";
+  /* 20. First 500-mile service — FSM §1 p. 1-1 + Scheduled Service Table pp. 1-34–1-37 */
+  $("first-500").innerHTML =
+    safetyHtml() +
+    "<p class='ed-note'>" + SH.first_500.dealer_note + "</p>" +
+    "<p class='ed-note'>" + SH.first_500.deferral_note + "</p>" +
+    "<h4>Check at first 500 miles — p. 1-1</h4>" +
+    "<ol>" + SH.first_500.check_at_first_500.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Replace (R)</h4><ul>" + SH.first_500.replace.map((s) => "<li>" + s + "</li>").join("") + "</ul>" +
+    "<h4>Perform (X)</h4><ul>" + SH.first_500.perform.map((s) => "<li>" + s + "</li>").join("") + "</ul>" +
+    "<h4>Inspect (I)</h4><ul>" + SH.first_500.inspect.map((s) => "<li>" + s + "</li>").join("") + "</ul>" +
+    "<h4>Lubricate (L)</h4><ul>" + SH.first_500.lubricate.map((s) => "<li>" + s + "</li>").join("") + "</ul>" +
+    "<h4>Inspect + lubricate (IL)</h4><ul>" + SH.first_500.inspect_lubricate.map((s) => "<li>" + s + "</li>").join("") + "</ul>" +
+    "<h4>Tighten (T)</h4><ul>" + SH.first_500.tighten.map((s) => "<li>" + s + "</li>").join("") + "</ul>" +
+    "<p class='ed-note'><b>Not at 500 miles:</b> " + SH.first_500.not_at_500 + "</p>" +
+    "<p class='ed-note'>Source: " + SH.first_500.ref + "</p>";
+  /* 21. Engine oil change — FSM §1 p. 1-38 */
+  $("engine-oil").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.engine_oil.interval + "</p>" +
+    "<p><b>Spec:</b> " + SH.engine_oil.spec + "</p>" +
+    "<ol>" + SH.engine_oil.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p><b>Oil grades (FSM §1 p. 1-38):</b></p>" +
+    SH.engine_oil.oil_grades.map((g) => "<p>" + g.type + " " + g.viscosity + " (" + g.rating + ") — lowest ambient " + g.lowest_ambient + ", cold starts below 50°F: " + g.cold_starts_below_50F + "</p>").join("") +
+    "<p class='ed-note'>" + SH.engine_oil.note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.engine_oil.ref + "</p>";
+  /* 22. Transmission oil change — FSM §1 p. 1-41 */
+  $("transmission-oil").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.transmission_oil.interval + "</p>" +
+    "<p><b>Spec:</b> " + SH.transmission_oil.spec + "</p>" +
+    "<ol>" + SH.transmission_oil.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Part-number conflict in the manual itself:</b> " + SH.transmission_oil.part_number_flag + "</p>" +
+    "<p class='ed-note'>Source: " + SH.transmission_oil.ref + "</p>";
+  /* 23. Primary chaincase oil change — FSM §1 pp. 1-39–1-40 */
+  $("primary-oil").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.primary_oil.interval + "</p>" +
+    "<p><b>Spec:</b> " + SH.primary_oil.spec + "</p>" +
+    "<ol>" + SH.primary_oil.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.primary_oil.caution + "</p>" +
+    "<p class='ed-note'>" + SH.primary_oil.note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.primary_oil.ref + "</p>";
+  /* 24. Brake fluid bleed & flush — FSM §2 p. 2-49; §1 p. 1-42 */
+  $("brake-fluid-flush").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.brake_fluid_flush.interval + "</p>" +
+    "<p><b>Spec:</b> " + SH.brake_fluid_flush.spec + "</p>" +
+    "<ol>" + SH.brake_fluid_flush.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>" + SH.brake_fluid_flush.note + "</p>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.brake_fluid_flush.warning + "</p>" +
+    "<p class='ed-note'><b>Eye warning:</b> " + SH.brake_fluid_flush.eye_warning + "</p>" +
+    "<p class='ed-note'><b>After service:</b> " + SH.brake_fluid_flush.after_service + "</p>" +
+    "<p class='ed-note'><b>Reservoir:</b> " + SH.brake_fluid_flush.reservoir + "</p>" +
+    "<p class='ed-note'>Source: " + SH.brake_fluid_flush.ref + "</p>";
+
+  /* 25. CV carburetor rebuild — FSM §4 pp. 4-14–4-18 */
+  $("carb-rebuild").innerHTML =
+    safetyHtml() +
+    "<p class='ed-note'><b>Warning:</b> " + SH.carb_rebuild.warning + "</p>" +
+    "<p class='ed-note'>" + SH.carb_rebuild.figure_note + "</p>" +
+    "<h4>Removal — p. 4-14</h4>" +
+    "<ol>" + SH.carb_rebuild.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Installation — p. 4-16</h4>" +
+    "<p class='ed-note'><b>Note:</b> " + SH.carb_rebuild.installation_note + "</p>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.carb_rebuild.installation_caution + "</p>" +
+    "<ol>" + SH.carb_rebuild.installation.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Disassembly — vacuum piston chamber, p. 4-16</h4>" +
+    "<ol>" + SH.carb_rebuild.disassembly_vacuum_piston.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Disassembly — carburetor body, p. 4-16</h4>" +
+    "<ol>" + SH.carb_rebuild.disassembly_carb_body.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Disassembly — accelerator pump, p. 4-16</h4>" +
+    "<ol>" + SH.carb_rebuild.disassembly_accel_pump.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Cleaning and inspection — vacuum piston, p. 4-16</h4>" +
+    "<ol>" + SH.carb_rebuild.cleaning_vacuum_piston.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Cleaning and inspection — carburetor body, p. 4-16</h4>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.carb_rebuild.cleaning_caution + "</p>" +
+    "<ol>" + SH.carb_rebuild.cleaning_carb_body.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Float replacement — p. 4-17</h4>" +
+    "<p class='ed-note'>" + SH.carb_rebuild.float_note + "</p>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.carb_rebuild.float_caution + "</p>" +
+    "<h4>Accelerator pump — inspect, p. 4-17</h4>" +
+    "<ol>" + SH.carb_rebuild.accel_pump_inspect.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Assembly — vacuum piston chamber, p. 4-17</h4>" +
+    "<ol>" + SH.carb_rebuild.assembly_vacuum_piston.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Assembly — carburetor body, pp. 4-17–4-18</h4>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.carb_rebuild.assembly_carb_body_caution + "</p>" +
+    "<ol>" + SH.carb_rebuild.assembly_carb_body.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Assembly — accelerator pump, p. 4-18</h4>" +
+    "<ol>" + SH.carb_rebuild.assembly_accel_pump.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>Source: " + SH.carb_rebuild.ref + "</p>";
 
   /* ---------- VIN (pure decode lives in vin.js, tested in test.js) ---------- */
   $("vin-decode").addEventListener("click", () => {
@@ -847,6 +1193,19 @@
       "<p>Year: " + (r.year ? r.year + " (code " + r.yearCode + ")" + (r.yearAmbiguous ? " — or " + r.yearAmbiguous + ", year codes repeat every 30 years" : "") : "unknown code " + r.yearCode) + "</p>" +
       "<p>Model: " + (r.model || "not in the 1997-98 Softail / 1986-2003 Sportster tables (code " + r.modelCode + ")") + "</p>" +
       "<p>Engine: " + (r.engineName || ("type code " + r.engineType)) + " &middot; Plant: " + (r.plantName || r.plant) + " &middot; Serial: <span class='ed-mono'>" + r.serial + "</span></p>" +
+      "<p class='ed-note'>" + r.note + "</p>";
+  });
+
+  /* ---------- Knucklehead engine serial (1940-47) — a different system
+     from the 17-digit VIN above. Pure decode lives in vin.js, tested in
+     test.js. Evo-era year codes never apply here. ---------- */
+  $("knuck-decode").addEventListener("click", () => {
+    const r = ED_VIN.decodeKnucklehead($("knuck-input").value);
+    const el = $("knuck-result");
+    if (r.error) { el.innerHTML = "<p>" + r.error + "</p>"; return; }
+    el.innerHTML = "<p>Year: <b>" + r.year + "</b> (leading two digits &ldquo;" + r.yearDigits + "&rdquo;)</p>" +
+      "<p>Model: " + (r.model ? "<b>" + r.modelCode + "</b> — " + r.model : "<b>" + r.modelCode + " — UNKNOWN model code.</b> Not in the manual's p. 3 table, so it is not guessed.") + "</p>" +
+      "<p>Serial number: <span class='ed-mono'>" + r.serialNumber + "</span> &middot; Full serial: <span class='ed-mono'>" + r.serial + "</span></p>" +
       "<p class='ed-note'>" + r.note + "</p>";
   });
 

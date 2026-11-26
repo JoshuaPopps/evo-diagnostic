@@ -140,7 +140,7 @@ eq("data.js engine code P", D.vin.engine_codes.P, "1200cc (Sportster)");
 eq("data.js plant code Y", D.vin.plant_codes.Y, "York, PA");
 
 /* --- trees: 14 now (13 + smoking / oil consumption, batch 2) --- */
-eq("trees count is 14", D.trees.length, 14);
+eq("trees count is 19", D.trees.length, 19);
 check("oil-leak tree present", D.trees.some((t) => t.id === "oil-leak"));
 check("clutch tree present", D.trees.some((t) => t.id === "clutch"));
 check("lights tree present", D.trees.some((t) => t.id === "lights"));
@@ -250,7 +250,7 @@ check("most expensive verified price is the transmission kit at $429.00", Core.g
 check("every cause part key exists in the parts core",
   D.trees.every((t) => t.causes.every((c) => !c.part ||
     (Array.isArray(c.part) ? c.part : [c.part]).every((k) => Core.getPrice(k) !== null))));
-eq("62 of 104 causes name a part", D.trees.reduce((n, t) => n + t.causes.filter((c) => c.part).length, 0), 62);
+eq("75 of 142 causes name a part", D.trees.reduce((n, t) => n + t.causes.filter((c) => c.part).length, 0), 75);
 check("every atlas part except the rubber plug and jackshaft has a live price",
   Object.keys(D.parts).every((k) => k === "rubber-plug" || k === "jackshaft" || (Core.getPrice(k) !== null && typeof Core.getPrice(k).price === "number")));
 check("rubber plug points at the rebuild kit instead of a fake price",
@@ -282,6 +282,79 @@ eq("same rpm but unsteady", A.compareBaseline({ rpm: 1025, sd: 80 }, { rpm: 1025
 eq("rpm-only baseline still compares", A.compareBaseline({ rpm: 1025 }, { rpm: 1025 }).verdict, "close");
 check("no baseline returns null", A.compareBaseline({ rpm: 1025, sd: 20 }, null) === null);
 eq("rpm delta is signed", A.compareBaseline({ rpm: 900, sd: 25 }, { rpm: 1025, sd: 20 }).rpmDelta, -125);
+
+/* --- full-spectrum comparison (v22 staging, UNVALIDATED vs real recordings) ---
+   Proven here on synthetic tones only: a tone at frequency X in "now",
+   absent in "baseline", must move exactly its band and none other.
+   Joshua's real recordings have not arrived; the UI says so. */
+const SPEC_SR = 48000, SPEC_FFT = 4096;
+check("spectrum has 8 bands", A.SPECTRUM_BANDS.length === 8);
+check("spectrum bands are contiguous and ascending, 50 Hz to 12 kHz",
+  A.SPECTRUM_BANDS[0].lo === 50 && A.SPECTRUM_BANDS[7].hi === 12000 &&
+  A.SPECTRUM_BANDS.every((b, i) => i === 0 || b.lo === A.SPECTRUM_BANDS[i - 1].hi) &&
+  A.SPECTRUM_BANDS.every((b) => b.lo < b.hi));
+check("every band names what lives there", A.SPECTRUM_BANDS.every((b) => b.id && b.label && b.lives));
+eq("spectrum change threshold is 6 dB", A.SPECTRUM_CHANGE_DB, 6);
+const flatSpec = A.toneSpectrum([], -40, SPEC_SR, SPEC_FFT); // floor everywhere
+const flatBands = A.spectrumToBands(flatSpec, SPEC_SR, SPEC_FFT);
+check("flat floor spectrum reduces to -100 dB in every band", flatBands.every((v) => v === -100));
+check("identical spectra -> no delta, no changed bands",
+  (() => { const c = A.compareSpectra(flatBands, flatBands); return c && c.changed.length === 0 && c.maxDelta === 0; })());
+check("averageSpectrum of nothing is null", A.averageSpectrum([]) === null && A.averageSpectrum(null) === null);
+check("spectrumToBands of nothing is null", A.spectrumToBands(null, SPEC_SR, SPEC_FFT) === null);
+check("compareSpectra of nothing is null", A.compareSpectra(null, flatBands) === null && A.compareSpectra(flatBands, [1, 2]) === null);
+check("averageSpectrum of silence frames stays at the floor",
+  A.averageSpectrum([new Float32Array(SPEC_FFT / 2).fill(-100), new Float32Array(SPEC_FFT / 2).fill(-100)]).every((v) => v === -100));
+// tone at 3000 Hz (lifter-tick band) in "now", absent in baseline
+const tickNow = A.spectrumToBands(A.toneSpectrum([3000], -40, SPEC_SR, SPEC_FFT), SPEC_SR, SPEC_FFT);
+const tickCmp = A.compareSpectra(tickNow, flatBands);
+check("3 kHz tone moves only the Tick band (changed: " + tickCmp.changed.join(",") + ")",
+  tickCmp.changed.length === 1 && tickCmp.changed[0] === "tick");
+check("3 kHz tone delta in Tick band is large and positive",
+  tickCmp.bands.find((b) => b.id === "tick").delta > 20);
+check("3 kHz tone leaves every other band at the floor",
+  tickCmp.bands.filter((b) => b.id !== "tick").every((b) => Math.abs(b.delta) < 1));
+// one tone per remaining band, each in isolation
+[["rumble", 100], ["low", 175], ["lowmid", 350], ["mid", 750], ["uppermid", 1500], ["hiss", 6000], ["air", 10000]].forEach(([id, hz]) => {
+  const now = A.spectrumToBands(A.toneSpectrum([hz], -40, SPEC_SR, SPEC_FFT), SPEC_SR, SPEC_FFT);
+  const c = A.compareSpectra(now, flatBands);
+  check(hz + " Hz tone moves only the " + id + " band (changed: " + c.changed.join(",") + ")",
+    c.changed.length === 1 && c.changed[0] === id);
+});
+// averaging happens per bin, in the linear domain: a -40 dB tone bin
+// averaged with a -100 dB floor bin lands at ~-46 dB (0.005 amplitude).
+// (The per-band average then dilutes a narrow tone across the whole
+// band — a 3-bin tone at -40 dB reads ~-75 dB in-band — which is why
+// the change threshold is 6 dB, not 20: real ticks and leaks are
+// broadband, not single tones.)
+const avgMix = A.averageSpectrum([A.toneSpectrum([3000], -40, SPEC_SR, SPEC_FFT), flatSpec]);
+const toneBin = Math.round(3000 / (SPEC_SR / SPEC_FFT));
+const toneBinDb = Math.round(avgMix[toneBin] * 10) / 10;
+check("averaging a -40 dB tone bin with a floor bin lands near -46 dB (got " + toneBinDb + ")",
+  toneBinDb > -48 && toneBinDb < -44);
+// compareBaseline carries the spectrum through; old rpm-only baselines keep working
+const specBase = { rpm: 1025, sd: 20, spectrum: flatBands, spectrumVersion: A.SPECTRUM_VERSION };
+const specCmp = A.compareBaseline({ rpm: 1025, sd: 20, spectrum: tickNow }, specBase);
+check("compareBaseline with spectra returns the spectrum comparison",
+  specCmp && specCmp.spectrum && specCmp.spectrum.changed.join(",") === "tick" && specCmp.verdict === "close");
+check("old baseline without a spectrum still compares on RPM, spectrum null",
+  (() => { const c = A.compareBaseline({ rpm: 1025, sd: 20, spectrum: tickNow }, { rpm: 1025, sd: 20 }); return c && c.verdict === "close" && c.spectrum === null; })());
+check("spectrum stored under a different version is ignored, not miscompared",
+  (() => { const c = A.compareBaseline({ rpm: 1025, sd: 20, spectrum: tickNow }, { rpm: 1025, sd: 20, spectrum: flatBands, spectrumVersion: 99 }); return c && c.spectrum === null; })());
+// wiring + UNVALIDATED copy
+const appjsSpec = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
+check("app.js captures spectrum frames in quick-listen and baseline save",
+  appjsSpec.includes("averageSpectrum(specFrames)") && appjsSpec.includes("spectrumToBands") && appjsSpec.includes("spectrumVersion"));
+check("app.js renders the spectrum chart and wires tree buttons by id",
+  appjsSpec.includes("spectrumChartSvg") && appjsSpec.includes("data-spectrum-tree") && appjsSpec.includes("SPECTRUM_TREE_LINKS"));
+check("app.js maps the mid band to the primary-drive tree and tick/hiss to engine-noise",
+  appjsSpec.includes('mid: "primary-drive"') && appjsSpec.includes('tick: "engine-noise"') && appjsSpec.includes('hiss: "engine-noise"'));
+check("app.js says plainly when no tree fits a band",
+  appjsSpec.includes("No tree in this app maps to this band alone"));
+check("index.html marks spectrum comparison as not yet validated",
+  html.toLowerCase().includes("spectrum comparison is not yet validated against real recordings"));
+check("app.js marks spectrum comparison as not yet validated in the results copy",
+  appjsSpec.includes("Spectrum comparison is not yet validated against real recordings"));
 
 /* --- listen and compare (YouTube links only) --- */
 eq("listen_compare has 10 entries", D.listen_compare.length, 10);
@@ -425,6 +498,49 @@ check("torque source line in data.js matches the module's source line",
 eq("own_photos has the Softail still", D.own_photos.length, 1);
 check("own photo file exists", fs.existsSync(path.join(__dirname, D.own_photos[0].file)));
 check("own photo is labeled as his", D.own_photos[0].credit.includes("Joshua's own photo"));
+/* --- round 3 (Nov 25, 2026): Atlas photo duplication fix ---
+   The Softail still appeared twice: a thumbnail in #cc-grid and the
+   large tappable photo map. Decision: keep the map (the interactive
+   surface), drop the thumbnail. The own_photos entry is flagged
+   in_photo_map and app.js skips flagged entries in the grid loop. */
+check("own photo flagged as the photo-map image (appears once, in the map)",
+  D.own_photos[0].in_photo_map === true);
+check("photo-map card in index.html uses the flagged file",
+  html.includes('<img class="ed-photo" src="' + D.own_photos[0].file + '"'));
+check("app.js skips in_photo_map entries when rendering the own-photos grid",
+  fs.readFileSync(path.join(__dirname, "app.js"), "utf8").includes("filter((p) => !p.in_photo_map)"));
+check("Atlas generic-layer note says the Softail still lives in the map card, not the grid",
+  html.includes("tappable photo map in the next card, not here"));
+
+/* --- tap-the-photo atlas: hand-placed regions on the Softail still ---
+   Regions are percent-based buttons in index.html, class ed-photo-spot,
+   wired by the same .ed-part click handler as the diagrams. Only parts
+   clearly visible in the shot are mapped — no auto-detection, no guesses.
+   Fat Boy / Knucklehead photos slot in later as their own per-photo maps. */
+const photoSpots = [...html.matchAll(/class="ed-part ed-photo-spot" data-part="([^"]+)" style="([^"]+)"/g)];
+eq("photo atlas maps exactly 4 regions", photoSpots.length, 4);
+eq("photo atlas maps heads, crankcase, fork, rear-axle — the clearly visible parts",
+  photoSpots.map((m) => m[1]).sort().join(","), "crankcase,fork,heads,rear-axle");
+check("every photo region resolves to a real part record",
+  photoSpots.every((m) => !!D.parts[m[1]] && !!D.parts[m[1]].fn && !!D.parts[m[1]].spec && !!D.parts[m[1]].failures && !!D.parts[m[1]].source));
+check("every photo region is percent-positioned (left/top/width/height in %)",
+  photoSpots.every((m) => /left:[\d.]+%;top:[\d.]+%;width:[\d.]+%;height:[\d.]+%/.test(m[2])));
+check("every photo region stays inside the photo bounds",
+  photoSpots.every((m) => {
+    const v = Object.fromEntries([...m[2].matchAll(/(left|top|width|height):([\d.]+)%/g)].map((x) => [x[1], parseFloat(x[2])]));
+    return v.left + v.width <= 100 && v.top + v.height <= 100;
+  }));
+check("tappable photo is Joshua's Softail still, in the Atlas panel before the detail box",
+  html.includes('<div class="ed-photo-map">') &&
+  html.includes('<img class="ed-photo" src="' + D.own_photos[0].file + '"') &&
+  html.indexOf('<div class="ed-photo-map">') > html.indexOf('id="panel-atlas"') &&
+  html.indexOf('<div class="ed-photo-map">') < html.indexOf('id="part-detail"'));
+check("photo atlas uses only the one own photo — no other image is mapped",
+  (html.match(/<div class="ed-photo-map">/g) || []).length === 1 &&
+  !html.includes('data-part="carb-body" style=') && !html.includes('data-part="exhaust-gaskets" style=') &&
+  !html.includes('data-part="belt" style=') && !html.includes('data-part="battery" style='));
+check("photo spots are buttons with labels (tap targets, not bare divs)",
+  photoSpots.every((m) => html.includes('<button type="button" class="ed-part ed-photo-spot" data-part="' + m[1] + '"')));
 
 /* --- manifest + icons + files + new modules --- */
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "manifest.json"), "utf8"));
@@ -433,8 +549,9 @@ check("manifest wires icon-192", (manifest.icons || []).some((i) => i.sizes === 
 check("manifest wires icon-512", (manifest.icons || []).some((i) => i.sizes === "512x512"));
 check("icon-512.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-512.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
 check("icon-192.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-192.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
-check("sw.js caches v15", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v15"));
-check("sw.js precaches tire.js + nhtsa.js + handoff.js + sw-update.js + shop.js + wizard.js + report.js", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("tire.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("nhtsa.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("handoff.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("sw-update.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("shop.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("wizard.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("report.js"));
+check("sw.js caches v22", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v22"));
+check("sw.js no longer names the v19 cache", !fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v19"));
+check("sw.js precaches tire.js + nhtsa.js + handoff.js + sw-update.js + shop.js + wizard.js + report.js + gating.js", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("tire.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("nhtsa.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("handoff.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("sw-update.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("shop.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("wizard.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("report.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("gating.js"));
 check("index.html loads tire.js + nhtsa.js + handoff.js + shop.js + wizard.js + report.js", html.includes('src="tire.js"') && html.includes('src="nhtsa.js"') && html.includes('src="handoff.js"') && html.includes('src="shop.js"') && html.includes('src="wizard.js"') && html.includes('src="report.js"'));
 check("index.html loads wizard.js + report.js before app.js", html.indexOf('src="wizard.js"') < html.indexOf('src="app.js"') && html.indexOf('src="report.js"') < html.indexOf('src="app.js"'));
 check("index.html has the new sections", ["part-detail", "flash-input", "tire-input", "clip-record", "history-list", "add-bike-model"].every((id) => html.includes('id="' + id + '"')));
@@ -503,7 +620,7 @@ check("every new-tree step yes-value is mapped in scoring",
   [richTree, transTree].every((t) => t.steps.every((s) => !s.yes || s.yes === "next" || Object.prototype.hasOwnProperty.call(S.YES_MAP, s.yes))));
 
 /* --- library sweep (Nov 24-25, 2026): Easyriders tips + Sportster/Clymer layer --- */
-eq("104 causes total after batch 2 overlooked (100 + 4)", D.trees.reduce((n, t) => n + t.causes.length, 0), 104);
+eq("144 causes total after round 3 (142 + 2 gap-fills)", D.trees.reduce((n, t) => n + t.causes.length, 0), 144);
 check("every tree's weights sum to 100",
   D.trees.every((t) => t.causes.reduce((n, c) => n + c.weight, 0) === 100));
 check("every tree step yes-value is mapped in scoring",
@@ -512,6 +629,69 @@ check("every cause has test/fix/urgency/ride",
   D.trees.every((t) => t.causes.every((c) => !!c.test && !!c.fix && ["low", "medium", "high", "critical"].includes(c.urgency) && !!c.ride)));
 check("magazine causes are flagged NOT an FSM cause or tied to an FSM corroboration",
   D.trees.every((t) => t.causes.every((c) => !c.source || !c.source.includes("Easyriders") || c.source.includes("NOT an FSM cause") || c.source.includes("FSM"))));
+
+/* --- go-crazy build (Nov 25, 2026): 5 trees from the Sportster 1986-2003 Troubleshooting Manual --- */
+const speedoTree = D.trees.find((t) => t.id === "speedometer-inoperative");
+const signalsTree = D.trees.find((t) => t.id === "turn-signals");
+const powerTree = D.trees.find((t) => t.id === "poor-power-acceleration");
+const overheatTree = D.trees.find((t) => t.id === "engine-overheating");
+const starterTree = D.trees.find((t) => t.id === "starter-wont-disengage");
+check("all five trouble-manual trees present", !!speedoTree && !!signalsTree && !!powerTree && !!overheatTree && !!starterTree);
+eq("speedometer tree has 7 causes", speedoTree.causes.length, 7);
+eq("turn-signals tree has 8 causes", signalsTree.causes.length, 8);
+eq("poor-power tree has 11 causes", powerTree.causes.length, 11);
+eq("overheating tree has 6 causes", overheatTree.causes.length, 6);
+eq("starter-wont-disengage tree has 4 causes", starterTree.causes.length, 4);
+[speedoTree, signalsTree, powerTree, overheatTree, starterTree].forEach((t) => {
+  eq(t.id + " weights sum to 100", t.causes.reduce((n, c) => n + c.weight, 0), 100);
+  t.steps.forEach((s, i) => check(t.id + " step " + i + " cites the troubleshooting manual", !!s.cite && s.cite.includes("Sportster 1986-2003 Troubleshooting Manual")));
+  t.causes.forEach((c) => check(t.id + " cause has test/fix/urgency/ride: " + c.cause.slice(0, 30), !!c.test && !!c.fix && ["low", "medium", "high", "critical"].includes(c.urgency) && !!c.ride));
+});
+/* Every new-tree yes-key bumps exactly one cause by 15 and nothing else —
+   this is what proves each YES_MAP word is unique within its tree. */
+[speedoTree, signalsTree, powerTree, overheatTree, starterTree].forEach((t) => {
+  const base = {};
+  t.causes.forEach((c) => { base[c.cause] = c.weight; });
+  const keys = [...new Set(t.steps.map((s) => s.yes).filter((k) => k && k !== "next"))];
+  keys.forEach((k) => {
+    const bumped = S.applyAnswer(base, t.causes, k, true);
+    const moved = t.causes.filter((c) => bumped[c.cause] !== c.weight);
+    check(t.id + " yes-key '" + k + "' bumps exactly one cause by 15",
+      moved.length === 1 && bumped[moved[0].cause] - moved[0].weight === 15);
+  });
+});
+check("speedometer tree: sensor power 8-12V (95-96) / 6-12V (97-98), white wire fluctuates 0-1V to 6-12V",
+  speedoTree.steps[2].q.includes("8-12 V") && speedoTree.steps[2].q.includes("6-12 V") &&
+  speedoTree.steps[5].q.includes("0-1 V") && speedoTree.steps[5].q.includes("6-12 V"));
+check("speedometer head cause says confirm at a dealership — Scanalyzer",
+  speedoTree.causes.find((c) => c.cause.includes("Speedometer head failed")).fix.includes("Scanalyzer"));
+check("speedometer tree has no pre-1995 application — electronic head only (year split is in the steps)",
+  speedoTree.steps[2].q.includes("1995-96") && speedoTree.steps[2].q.includes("1997-98"));
+check("turn-signals tree: module power 12V at terminals 1-2, switch inputs 1-7 right / 1-8 left",
+  signalsTree.steps[2].q.includes("terminals 1 and 2") && signalsTree.steps[3].q.includes("terminals 1 and 7") &&
+  signalsTree.steps[4].q.includes("terminals 1 and 8"));
+check("turn-signals tree: jumper 2-3 lights the right lamps, 2-4 the left",
+  signalsTree.steps[5].q.includes("terminals 2 and 3") && signalsTree.steps[6].q.includes("terminals 2 and 4"));
+check("turn-signals cancel cause uses the white/green speedometer signal (Fig. 100)",
+  signalsTree.causes[0].test.includes("white/green") && signalsTree.causes[0].test.includes("6-12 V"));
+check("poor-power tree: leakdown over 12% between cylinders, listen for the leak",
+  powerTree.steps[9].q.includes("12%") && powerTree.causes.find((c) => c.cause.includes("Poor engine condition")).test.includes("Over 12% loss difference"));
+check("poor-power tree: float level 0.413-0.453 in on the high-speed cause",
+  powerTree.causes.find((c) => c.cause.includes("high speeds")).fix.includes("0.413-0.453 in"));
+check("poor-power tree: timing 20 deg BTDC, plugs 5R6A 0.038-0.043 in",
+  powerTree.steps[4].q.includes("20 deg BTDC") && powerTree.steps[3].q.includes("0.038-0.043 in"));
+check("overheating tree: oil light above idle means oil not circulating — DO NOT RIDE",
+  overheatTree.causes.find((c) => c.cause.includes("Oil not circulating")).ride.includes("DO NOT RIDE") &&
+  overheatTree.causes.find((c) => c.cause.includes("Oil not circulating")).test.includes("above idle"));
+check("overheating tree: lean carb is the first-listed cause, timing the second",
+  overheatTree.causes.find((c) => c.cause.includes("running lean")).test.includes("carb-lean-idle") &&
+  overheatTree.causes.find((c) => c.cause.includes("Ignition timing")).test.includes("20 deg BTDC"));
+check("starter tree: solenoid compression spring, pinion jammed on worn ring gear, disconnect the battery",
+  starterTree.causes.find((c) => c.cause.includes("Sticking solenoid")).test.includes("compression spring") &&
+  starterTree.causes.find((c) => c.cause.includes("pinion gear jammed")).test.includes("ring gear") &&
+  starterTree.causes[0].ride.includes("disconnect the battery"));
+check("starter tree: grinding is the broken overrunning clutch or wrong engagement",
+  starterTree.causes.find((c) => c.cause.includes("Grinding")).test.includes("overrunning clutch"));
 const sportsterChapter = D.torque.chapters.find((c) => c.title.startsWith("Sportster"));
 check("Sportster torque chapter present", !!sportsterChapter);
 eq("Sportster torque chapter has 2 rows", sportsterChapter.slugs.length, 2);
@@ -546,7 +726,7 @@ const noiseTree = D.trees.find((t) => t.id === "engine-noise");
 eq("oil-leak tree has 10 causes", oilTree.causes.length, 10);
 eq("wheels tree has 9 causes", wheelsTree.causes.length, 9);
 eq("brakes tree has 7 causes", brakesTree.causes.length, 7);
-eq("no-start tree has 8 causes", noStartTree.causes.length, 8);
+eq("no-start tree has 9 causes", noStartTree.causes.length, 9);
 eq("engine-noise tree has 7 causes", noiseTree.causes.length, 7);
 check("Vol. 3 reversion cause is flagged NOT an FSM cause",
   richTree.causes.some((c) => c.cause.includes("Reversion spitback") && c.source.includes("NOT an FSM cause") && c.source.includes("Tips Vol. 3")));
@@ -583,7 +763,7 @@ check("app.js renders cause sources in results", appjs.includes("c.source"));
    suspension 10→5, clutch primary oil 10→5. */
 const leanTree = D.trees.find((t) => t.id === "carb-lean-idle");
 const clutchTree = D.trees.find((t) => t.id === "clutch");
-eq("lean-idle tree has 8 causes", leanTree.causes.length, 8);
+eq("lean-idle tree has 10 causes", leanTree.causes.length, 10);
 eq("clutch tree has 7 causes", clutchTree.causes.length, 7);
 check("batch 2 breather cause flagged Vol. 2 §36",
   leanTree.causes.some((c) => c.cause.includes("Float-bowl breather") && c.source.includes("NOT an FSM cause") && c.source.includes("Vol. 2, §36")));
@@ -625,6 +805,51 @@ check("pushrod yes bumps only the pushrod cause by 15",
   clutchTree.causes.filter((c) => !c.cause.includes("Pressure plate lifts uneven")).every((c) => S.applyAnswer(clutchBase, clutchTree.causes, "pushrod", true)[c.cause] === c.weight));
 check("batch 2 steps cite their sources",
   [leanTree, noStartTree, wheelsTree, clutchTree].every((t) => t.steps.every((s) => !!s.cite)));
+
+/* --- fix-them-all batch (Nov 25, 2026): A3 ladder + O-rings, B5 annual legs, B7 Ronnie's 1995 FLSTF link ---
+   A3 reverses the Nov 24 sweep's two rejected citations — both were RIGHT.
+   The sweep's neighbor-check read only magsearch's 800-char truncation:
+   ER_153 §27 opens with the transition-circuit holes and the ladder sits in
+   the chunk's second half; ER_267 §43 opens with "SAVE THE SEALS" (pushrod
+   Quad seals, '82 FLH) and the O-ring warm-restart letter ("NO PICK UP")
+   sits in the same chunk's second half. Both verified verbatim in the DB. */
+check("A3 ladder cause is wired with the ER_153 §27 citation and the full ladder",
+  leanTree.causes.some((c) => c.cause.includes("symptom ladder") && c.source.includes("NOT an FSM cause") && c.source.includes("ER_153 §27") &&
+    c.test.includes("loads up") && c.test.includes("black smoke") && c.test.includes("bucks and jumps") && c.test.includes("surges at a steady cruise")));
+check("A3 O-ring cause is wired with ER_267 §43 + ER_390 Evo corroboration, Shovelhead letter flagged",
+  leanTree.causes.some((c) => c.cause.includes("Manifold O-rings leaking") && c.source.includes("NOT an FSM cause") && c.source.includes("ER_267 §43") && c.source.includes("ER_390 §45") && c.source.includes("Shovelhead")));
+check("A3 rebalance keeps lean-idle at 100 (intake-leak 25→20, turn-count 10→5, ladder 5, O-rings 5)",
+  leanTree.causes.find((c) => c.cause.includes("Intake leak")).weight === 20 &&
+  leanTree.causes.find((c) => c.cause.includes("turn-count")).weight === 5 &&
+  leanTree.causes.find((c) => c.cause.includes("symptom ladder")).weight === 5 &&
+  leanTree.causes.find((c) => c.cause.includes("Manifold O-rings")).weight === 5 &&
+  leanTree.causes.reduce((n, c) => n + c.weight, 0) === 100);
+check("A3 ladder + O-ring causes carry part keys that resolve in the parts core",
+  ["symptom ladder", "Manifold O-rings"].every((frag) => { const c = leanTree.causes.find((x) => x.cause.includes(frag)); return c && c.part && Core.getPrice(c.part) !== null; }));
+const leanBaseA3 = {};
+leanTree.causes.forEach((c) => { leanBaseA3[c.cause] = c.weight; });
+check("ladder yes bumps only the ladder cause by 15",
+  S.applyAnswer(leanBaseA3, leanTree.causes, "ladder", true)["Idle jet wrong size — symptom ladder (one/two sizes rich or lean)"] - 5 === 15 &&
+  leanTree.causes.filter((c) => !c.cause.includes("symptom ladder")).every((c) => S.applyAnswer(leanBaseA3, leanTree.causes, "ladder", true)[c.cause] === c.weight));
+check("orings yes bumps only the O-ring cause by 15",
+  S.applyAnswer(leanBaseA3, leanTree.causes, "orings", true)["Manifold O-rings leaking — won't idle after a warm restart"] - 5 === 15 &&
+  leanTree.causes.filter((c) => !c.cause.includes("Manifold O-rings")).every((c) => S.applyAnswer(leanBaseA3, leanTree.causes, "orings", true)[c.cause] === c.weight));
+check("B5 oil service carries the FSM (*) annual leg (specs + shop card)",
+  D.specs.oil_service.includes("annually") && D.specs.oil_service.includes("prior to storage") && D.specs.oil_service.includes("(*)") &&
+  D.shop.oil.service.includes("annually") && D.shop.oil.service.includes("1-34"));
+check("B5 wheel-bearing atlas record + wheels cause carry the FSM (*) annual leg (p. 1-35)",
+  D.parts["wheel-bearing"].failures.includes("annually") && D.parts["wheel-bearing"].failures.includes("1-35") &&
+  wheelsTree.causes.find((c) => c.cause.includes("Wheel bearings")).test.includes("annually"));
+check("B5 brake-fluid atlas record carries the FSM (*) annual leg (p. 1-36)",
+  D.parts["dot5-fluid"].failures.includes("annually") && D.parts["dot5-fluid"].failures.includes("1-36"));
+check("B5 front-fork-oil cause carries the FSM (*) annual leg (p. 1-36, fifth asterisked item)",
+  wheelsTree.causes.find((c) => c.cause.includes("Fork oil level")).fix.includes("annually") && wheelsTree.causes.find((c) => c.cause.includes("Fork oil level")).fix.includes("1-36"));
+check("B5 no annual leg is claimed for rear-fork/swingarm bearings (no FSM row for them)",
+  !D.trees.some((t) => t.causes.some((c) => ((c.test + " " + c.fix).toLowerCase().includes("swingarm") || (c.test + " " + c.fix).toLowerCase().includes("rear fork")) && (c.test + " " + c.fix).toLowerCase().includes("annually"))));
+check("B7 Ronnie's 1995 FLSTF model-203 fiche link is wired (link only)",
+  D.parts_suppliers.some((s) => s.url === "https://partsfinder.onlinemicrofiche.com/ronnies/showmodel/13/harleydavidsonmc/203/%20/1995%20Harley%20Davidson%20Street%20Bike%20FLSTF%20FAT%20BOY%20(BM)" && s.name.includes("1995 FLSTF")));
+check("B7 no Ronnie's FLSTC link (1990 has no page; 1991 is the wrong year)",
+  D.parts_suppliers.every((s) => !s.url.includes("FLSTC")));
 eq("petcock-screens cause maps to FUEL SYSTEM, GASOLINE 7",
   NH.complaintForCause(counts, "Starting", "Petcock filter screens blocked by rust after storage — fuel starvation").count, 7);
 check("wrong-tire cause shows no count (rider selection, like pressure)",
@@ -715,11 +940,15 @@ check("answer() ignores clicks after the tree is done", appjs.includes("if (curr
 check("finishTree clears the question buttons", appjs.includes("$(\"tree-step\").innerHTML = \"\";"));
 
 /* --- shop tab (Nov 25, 2026 batch 1): 11 pull-ins, library-first --- */
+/* --- wave 2 (Nov 25, 2026): + tire reader + unit converter = 13 cards --- */
+/* --- wave 3 (Nov 25, 2026): + belt, clutch, primary chain, storage = 17 cards --- */
+/* --- wave 4 (Nov 25, 2026): + brake pads, fork oil, first 500-mile service = 20 cards --- */
+/* --- wave 5 (Nov 25, 2026): + engine oil, transmission oil, primary oil, brake fluid flush = 24 cards --- */
 const SH = require("./shop.js");
 check("index.html has the Shop tab", html.includes('data-tab="shop"') && html.includes('id="panel-shop"'));
-["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride"].forEach((id) =>
+["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride", "tire-reader", "unit-converter", "belt-adjust", "clutch-adjust", "primary-chain", "storage", "brake-pads", "fork-oil", "first-500", "engine-oil", "transmission-oil", "primary-oil", "brake-fluid-flush"].forEach((id) =>
   check("index.html has the " + id + " card", html.includes('id="' + id + '"')));
-check("app.js renders all 11 shop cards", ["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride"].every((id) => appjs.includes("$(\"" + id + "\")")));
+check("app.js renders all 24 shop cards", ["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride", "tire-reader", "unit-converter", "belt-adjust", "clutch-adjust", "primary-chain", "storage", "brake-pads", "fork-oil", "first-500", "engine-oil", "transmission-oil", "primary-oil", "brake-fluid-flush"].every((id) => appjs.includes("$(\"" + id + "\")")));
 check("index.html loads shop.js before app.js", html.indexOf('src="shop.js"') > 0 && html.indexOf('src="shop.js"') < html.indexOf('src="app.js"'));
 
 /* plug reader: 9 conditions from Repair Manual Ch. 3 p. 112 */
@@ -834,16 +1063,423 @@ check("sag procedure: shock bolts 115-130 ft-lbs, shocks not repairable", D.shop
 eq("sag drop is unloaded minus loaded", SH.sagDrop(12, 10.5), 1.5);
 check("sag has no target — the gap is named, not filled", D.shop.sag.no_target.includes("No factory sag target is published"));
 check("sag magazine line is flagged magazine", D.shop.sag.magazine.includes("magazine"));
+check("sag re-search (Nov 25, 2026) names every source searched and what each one actually says",
+  D.shop.sag.no_target.includes("Re-searched Nov 25, 2026") &&
+  D.shop.sag.no_target.includes("FSM #99482-98") &&
+  D.shop.sag.no_target.includes("Clymer") &&
+  D.shop.sag.no_target.includes("Easyriders") &&
+  D.shop.sag.no_target.includes("Tech Tips") &&
+  D.shop.sag.no_target.includes("still needs Joshua's number"));
 
-/* parts interchange: 7 rows, magazine rows flagged */
-eq("interchange has 7 rows", D.shop.interchange.rows.length, 7);
+/* parts interchange: 14 rows, magazine rows flagged */
+eq("interchange has 14 rows", D.shop.interchange.rows.length, 14);
 check("wheel bearing 9052 fits 1973-99 Big Twin + Sportster", D.shop.interchange.rows.some((r) => r.part.includes("9052") && r.fits.includes("1973-99")));
 check("brake pads 44063-83C/D fit all XL/FX/FL 1984-99", D.shop.interchange.rows.some((r) => r.part.includes("44063-83C/D") && r.fits.includes("1984-99")));
-check("stator and regulator rows are explicit NON-interchange warnings", D.shop.interchange.rows.filter((r) => r.fits.startsWith("DOES NOT interchange")).length === 2);
+check("stator, regulator, pads-vs-92-rotors and VOES rows are explicit NON-interchange warnings", D.shop.interchange.rows.filter((r) => r.fits.startsWith("DOES NOT interchange")).length === 4);
+check("Big Twin stator 29970-88C fits Softail 1989-99, Dyna, FXR, carbureted Touring; excludes EFI and Sportsters",
+  D.shop.interchange.rows.some((r) => r.part.includes("29970-88C") && r.fits.includes("Softail 1989-99") && r.note.includes("Excludes EFI Touring")));
+check("Sportster stator 29967-89C fits all XL 1991-2006 + Buell M2 1997-2002",
+  D.shop.interchange.rows.some((r) => r.part.includes("29967-89C") && r.fits.includes("1991-2006") && r.fits.includes("Buell M2")));
+check("Sportster regulator 74523-94A fits all XL 1994-2003, battery models only",
+  D.shop.interchange.rows.some((r) => r.part.includes("74523-94A") && r.fits.includes("1994-2003") && r.note.includes("Battery models only")));
+check("Big Twin regulator 74519-88A shares the stator year window",
+  D.shop.interchange.rows.some((r) => r.part.includes("74519-88A") && r.fits.includes("Softail 1989-99") && r.note.includes("changed as a set in 1989")));
+check("1991-and-earlier pads must not be used with 1992 stainless rotors (P-20)",
+  D.shop.interchange.rows.some((r) => r.part.includes("1992 stainless rotors") && r.fits.includes("DOES NOT interchange") && r.source.includes("P-20")));
+check("wheel bearing 9052 has a second application: Big Twin swingarms 1958-84",
+  D.shop.interchange.rows.some((r) => r.part.includes("9052") && r.fits.includes("swingarms 1958-84")));
+check("VOES does not interchange across year bands — 26557-83, 26566-91, 26566-96",
+  D.shop.interchange.rows.some((r) => r.part.includes("VOES") && r.fits.includes("26557-83") && r.fits.includes("26566-91") && r.fits.includes("26566-96")));
+check("interchange ref names the aftermarket corroboration sources",
+  D.shop.interchange.ref.includes("Drag Specialties") && D.shop.interchange.ref.includes("Cycle Electric") && D.shop.interchange.ref.includes("FXR Archive"));
 check("magazine interchange rows are flagged NOT an FSM cause",
   D.shop.interchange.rows.filter((r) => r.source.includes("Easyriders")).every((r) => r.source.includes("NOT an FSM cause")));
 check("head bolts / rocker boxes row warns they do not interchange between years",
   D.shop.interchange.rows.some((r) => r.part.includes("Cylinder head bolts") && r.fits.includes("NOT interchangeable")));
+
+/* tire reader: sidewall decode from the Nov 21, 2026 tire-standards research */
+const TR = D.shop.tire_reader;
+eq("alpha table has 10 rows", TR.alpha.length, 10);
+eq("MT90 is 130/90 (stock Evo Softail rear)", TR.alpha.find((r) => r.alpha === "MT90").metric, "130/90");
+eq("load index table covers LI 40-91 (52 rows)", TR.load_index.length, 52);
+eq("LI 67 is 307 kg / 677 lb", SH.loadIndexKg(67, TR.load_index).kg + "/" + SH.loadIndexKg(67, TR.load_index).lb, "307/677");
+eq("LI 74 is 375 kg / 827 lb", SH.loadIndexKg(74, TR.load_index).kg + "/" + SH.loadIndexKg(74, TR.load_index).lb, "375/827");
+eq("LI 57 is 230 kg / 507 lb (typical Evo front)", SH.loadIndexKg(57, TR.load_index).kg + "/" + SH.loadIndexKg(57, TR.load_index).lb, "230/507");
+check("load-index lb is kg x 2.2046 rounded on every row",
+  TR.load_index.every((r) => SH.loadIndexKg(r.li, TR.load_index).lb === Math.round(r.kg * 2.2046)));
+check("load index outside the table returns null", SH.loadIndexKg(99, TR.load_index) === null);
+eq("speed H is 210 km/h / 130 mph", SH.speedRating("H", TR.speed_rating).kmh + "/" + SH.speedRating("H", TR.speed_rating).mph, "210/130");
+eq("speed P is 150 km/h / 93 mph (not the 94 mph variant)", SH.speedRating("P", TR.speed_rating).kmh + "/" + SH.speedRating("P", TR.speed_rating).mph, "150/93");
+eq("speed S is 180 km/h / 112 mph", SH.speedRating("S", TR.speed_rating).kmh + "/" + SH.speedRating("S", TR.speed_rating).mph, "180/112");
+check("unknown speed symbol returns null", SH.speedRating("X", TR.speed_rating) === null);
+check("metric size decodes: 130/90-16 is 130 mm, 90%, bias, 16 in rim",
+  (() => { const d = SH.tireSizeDecode("130/90-16", TR.alpha); return d.system === "metric" && d.width_mm === 130 && d.aspect === 90 && d.construction === "bias" && d.rim_in === 16; })());
+check("radial decodes: 180/55ZR17 is radial with a Z prefix",
+  (() => { const d = SH.tireSizeDecode("180/55ZR17", TR.alpha); return d.system === "metric" && d.construction === "radial" && d.speed_prefix === "Z" && d.rim_in === 17; })());
+check("alpha decodes: MT90-16 is alpha, about 130/90, bias",
+  (() => { const d = SH.tireSizeDecode("MT90-16", TR.alpha); return d.system === "alpha" && d.alpha === "MT90" && d.metric_equiv === "130/90" && d.construction === "bias"; })());
+check("alpha B is bias-belted: MT90B16",
+  (() => { const d = SH.tireSizeDecode("MT90B16", TR.alpha); return d.construction === "bias-belted" && d.rim_in === 16; })());
+check("inch decodes: 5.00-16 is 5.00 in (127 mm), bias, no aspect",
+  (() => { const d = SH.tireSizeDecode("5.00-16", TR.alpha); return d.system === "inch" && d.width_in === 5 && d.width_mm === 127 && d.aspect === null && d.rim_in === 16; })());
+check("garbage size returns an error, not a guess", SH.tireSizeDecode("banana", TR.alpha).error !== undefined);
+check("service description decodes: 130/90-16 M/C 67H is LI 67 + speed H",
+  (() => { const s = SH.tireServiceDecode("130/90-16 M/C 67H", TR.load_index, TR.speed_rating); return s.load_index === 67 && s.load.kg === 307 && s.speed.symbol === "H" && s.speed.mph === 130; })());
+check("service description decodes without M/C: MT90-16 74H",
+  (() => { const s = SH.tireServiceDecode("MT90-16 74H", TR.load_index, TR.speed_rating); return s.load_index === 74 && s.load.kg === 375 && s.speed.symbol === "H"; })());
+check("size with no service description has null load and speed",
+  (() => { const s = SH.tireServiceDecode("130/90-16", TR.load_index, TR.speed_rating); return s.load_index === null && s.speed === null; })());
+check("tire reader cites the Nov 21 research report", TR.ref.includes("Nov 21, 2026") && TR.ref.includes("tire-helmet-standards-20261121"));
+check("tire notes carry the 5-year-inspect / 10-year-replace rule and name Michelin + Dunlop",
+  TR.notes.some((n) => n.includes("5 years") && n.includes("10 years") && n.includes("Michelin") && n.includes("Dunlop")));
+check("tire notes say the 6-year figure is a car-tire number, not for motorcycles",
+  TR.notes.some((n) => n.includes("6-year") && n.includes("car-tire")));
+check("tire notes say the sidewall number is the maximum, never the recommended pressure",
+  TR.notes.some((n) => n.includes("MAXIMUM") && n.includes("never the recommended")));
+check("tire notes carry the tread limits (2/32 consider new, 1/32 worn out)",
+  TR.notes.some((n) => n.includes("2/32") && n.includes("1/32")));
+check("tire notes flag the alpha B load-range trap",
+  TR.notes.some((n) => n.includes("Load Range B")));
+check("tire notes say kg is authoritative and lb is rounded",
+  TR.notes.some((n) => n.includes("kg is the authoritative") && n.includes("rounded")));
+check("app.js tire reader reuses ED_Tire.decode for the DOT date (no second date decoder)",
+  appjs.includes("ED_Tire.decode(dot, new Date())"));
+check("app.js tire reader renders the alpha table and the notes", appjs.includes("SH.tire_reader.alpha") && appjs.includes("SH.tire_reader.notes"));
+
+/* unit converter: standard definitions, exact factors */
+const UC = D.shop.unit_converter;
+eq("unit converter has 4 categories", UC.categories.length, 4);
+check("unit converter labels its factors standard definitions, not manual specs",
+  UC.ref.includes("Standard unit definitions") && UC.ref.includes("not manual specs"));
+eq("1 inch = 25.4 mm exactly", SH.unitConvert(1, "in", "mm", UC.categories[0].units), 25.4);
+eq("25.4 mm = 1 inch", SH.unitConvert(25.4, "mm", "in", UC.categories[0].units), 1);
+eq("1 mile = 1609.344 m", SH.unitConvert(1, "mi", "m", UC.categories[0].units), 1609.344);
+eq("1 foot = 12 inches", Math.round(SH.unitConvert(1, "ft", "in", UC.categories[0].units) * 10000) / 10000, 12);
+eq("1 ft-lb = 12 in-lb exactly", SH.unitConvert(1, "ftlb", "inlb", UC.categories[1].units), 12);
+eq("1 ft-lb = 1.3558 N·m (4 dp)", Math.round(SH.unitConvert(1, "ftlb", "Nm", UC.categories[1].units) * 10000) / 10000, 1.3558);
+eq("115 ft-lb = 155.92 N·m (FSM shock-bolt low end)", Math.round(SH.unitConvert(115, "ftlb", "Nm", UC.categories[1].units) * 100) / 100, 155.92);
+eq("1 N·m = 0.7376 ft-lb (4 dp)", Math.round(SH.unitConvert(1, "Nm", "ftlb", UC.categories[1].units) * 10000) / 10000, 0.7376);
+eq("1 kg·m = 9.80665 N·m", SH.unitConvert(1, "kgm", "Nm", UC.categories[1].units), 9.80665);
+eq("1 psi = 6.895 kPa (3 dp)", Math.round(SH.unitConvert(1, "psi", "kPa", UC.categories[2].units) * 1000) / 1000, 6.895);
+eq("36 psi = 248.2 kPa (1 dp)", Math.round(SH.unitConvert(36, "psi", "kPa", UC.categories[2].units) * 10) / 10, 248.2);
+eq("1 bar = 14.5038 psi (4 dp)", Math.round(SH.unitConvert(1, "bar", "psi", UC.categories[2].units) * 10000) / 10000, 14.5038);
+eq("1 US fl oz = 29.5735 mL (4 dp)", Math.round(SH.unitConvert(1, "floz", "mL", UC.categories[3].units) * 10000) / 10000, 29.5735);
+eq("1 US quart = 946.3529 mL (4 dp)", Math.round(SH.unitConvert(1, "qt", "mL", UC.categories[3].units) * 10000) / 10000, 946.3529);
+eq("3.0 qt oil tank = 2.8391 L (4 dp)", Math.round(SH.unitConvert(3, "qt", "L", UC.categories[3].units) * 10000) / 10000, 2.8391);
+eq("1 cubic inch = 16.387064 mL", SH.unitConvert(1, "cuin", "mL", UC.categories[3].units), 16.387064);
+eq("81.6 cu in = 1337.2 mL (1 dp)", Math.round(SH.unitConvert(81.6, "cuin", "mL", UC.categories[3].units) * 10) / 10, 1337.2);
+check("same unit converts to itself", SH.unitConvert(42, "psi", "psi", UC.categories[2].units) === 42);
+check("unknown unit returns null", SH.unitConvert(1, "psi", "furlong", UC.categories[2].units) === null);
+check("non-numeric value returns null", SH.unitConvert(NaN, "psi", "kPa", UC.categories[2].units) === null);
+check("unit converter notes name the exact definitions (25.4 mm, 12 in-lb, 29.5735295625 mL)",
+  UC.notes.some((n) => n.includes("25.4 mm") && n.includes("12 in-lb") && n.includes("29.5735295625")));
+check("unit converter notes carry the 3.0 qt oil-tank conversion context",
+  UC.notes.some((n) => n.includes("3.0 qt")));
+check("app.js unit converter wires category/value/from/to and renders the result",
+  appjs.includes("$(\"uc-cat\")") && appjs.includes("$(\"uc-from\")") && appjs.includes("$(\"uc-to\")") && appjs.includes("ED_Shop.unitConvert"));
+
+/* belt adjustment: FSM §1 pp. 1-43–1-44 */
+eq("belt procedure has 5 steps", D.shop.belt.steps.length, 5);
+check("belt spec is 3/8-1/2 in at 10 lbs with gauge HD-35381",
+  D.shop.belt.spec.includes("3/8–1/2 in") && D.shop.belt.spec.includes("9.5–13 mm") &&
+  D.shop.belt.spec.includes("10 lbs") && D.shop.belt.spec.includes("HD-35381"));
+check("belt conditions: tightest point, cold, owner's weight",
+  D.shop.belt.conditions.some((c) => c.includes("tightest point")) &&
+  D.shop.belt.conditions.some((c) => c.includes("cold")) &&
+  D.shop.belt.conditions.some((c) => c.includes("weight of the owner")));
+check("belt interval is 500 miles then every 5000", D.shop.belt.interval.includes("500 mile") && D.shop.belt.interval.includes("5000 mile"));
+check("belt adjust: equal turns on each adjuster bolt to keep the wheel aligned",
+  D.shop.belt.steps.some((s) => s.includes("equal number of turns") && s.includes("wheel aligned")));
+check("belt axle nut 60 ft-lbs, never over 65 ft-lbs",
+  D.shop.belt.steps.some((s) => s.includes("60 ft-lbs")) && D.shop.belt.caution.includes("65 ft-lbs") &&
+  D.shop.belt.caution.includes("wheel bearings to seize"));
+check("belt ref cites FSM §1 pp. 1-43–1-44", D.shop.belt.ref.includes("pp. 1-43–1-44"));
+check("app.js belt card renders spec, steps and caution",
+  appjs.includes("SH.belt.spec") && appjs.includes("SH.belt.steps") && appjs.includes("SH.belt.caution"));
+
+/* clutch adjustment: FSM §1 p. 1-40 */
+eq("clutch procedure has 7 steps", D.shop.clutch.steps.length, 7);
+check("clutch interval is predelivery, 500 miles, every 5000",
+  D.shop.clutch.interval.includes("predelivery") && D.shop.clutch.interval.includes("500 mile") && D.shop.clutch.interval.includes("5000 mile"));
+check("clutch caution is room temperature — hot adjustment slips the clutch cold",
+  D.shop.clutch.caution.includes("room temperature") && D.shop.clutch.caution.includes("clutch slippage"));
+check("clutch step 4 takes up all pushrod free play clockwise",
+  D.shop.clutch.steps[3].includes("take up all free play") && D.shop.clutch.steps[3].includes("clockwise"));
+check("clutch step 5 backs out 1/2 to 1 turn, jamnut 6-10 ft-lbs",
+  D.shop.clutch.steps[4].includes("1/2 to 1 full turn") && D.shop.clutch.steps[4].includes("6–10 ft-lbs"));
+check("clutch step 6 squeezes the lever three times, cable free play 1/16-1/8 in",
+  D.shop.clutch.steps[5].includes("three times") && D.shop.clutch.steps[5].includes("1/16–1/8 in"));
+check("clutch cover screws 50-70 in-lbs with new O-ring and washers",
+  D.shop.clutch.steps[6].includes("50–70 in-lbs") && D.shop.clutch.steps[6].includes("new O-ring"));
+check("clutch note: re-adjust after 500 miles if components were replaced",
+  D.shop.clutch.note.includes("500 miles") && D.shop.clutch.note.includes("replaced"));
+check("clutch ref cites FSM §1 p. 1-40", D.shop.clutch.ref.includes("p. 1-40"));
+check("app.js clutch card renders interval, caution, steps and note",
+  appjs.includes("SH.clutch.interval") && appjs.includes("SH.clutch.caution") && appjs.includes("SH.clutch.steps") && appjs.includes("SH.clutch.note"));
+
+/* primary chain: FSM §1 pp. 1-38–1-39 */
+eq("primary chain procedure has 4 steps", D.shop.primary_chain.steps.length, 4);
+check("primary chain spec is 5/8-7/8 in cold, 3/8-5/8 in hot",
+  D.shop.primary_chain.spec.includes("5/8–7/8 in") && D.shop.primary_chain.spec.includes("15.9–22.3 mm") &&
+  D.shop.primary_chain.spec.includes("3/8–5/8 in") && D.shop.primary_chain.spec.includes("9.5–15.9 mm"));
+check("primary chain warning is battery negative first",
+  D.shop.primary_chain.warning.includes("negative cable first") && D.shop.primary_chain.warning.includes("battery explosion"));
+check("primary chain caution is tightest spot, never tighter than spec",
+  D.shop.primary_chain.caution.includes("tightest spot") && D.shop.primary_chain.caution.includes("too tight"));
+check("primary chain step 3: loosen center bolt nut (do not remove), shoe up/down, 21-29 ft-lbs",
+  D.shop.primary_chain.steps[2].includes("do not remove") && D.shop.primary_chain.steps[2].includes("shoe assembly") &&
+  D.shop.primary_chain.steps[2].includes("21–29 ft-lbs"));
+check("primary chain step 3: replace the chain if it cannot be adjusted",
+  D.shop.primary_chain.steps[2].includes("Replace the primary chain"));
+check("primary chain cover screws cite Figure 1-2 with both printed values, no guessed assignment",
+  D.shop.primary_chain.steps[3].includes("Figure 1-2") &&
+  D.shop.primary_chain.figure_note.includes("50–70 in-lbs") && D.shop.primary_chain.figure_note.includes("108–120 in-lbs") &&
+  D.shop.primary_chain.figure_note.includes("Match each screw to its callout"));
+check("primary chain interval is 500 miles then every 5000", D.shop.primary_chain.interval.includes("500 mile") && D.shop.primary_chain.interval.includes("5000 mile"));
+check("primary chain ref cites FSM §1 pp. 1-38–1-39", D.shop.primary_chain.ref.includes("pp. 1-38–1-39"));
+check("app.js primary chain card renders warning, spec, steps and figure note",
+  appjs.includes("SH.primary_chain.warning") && appjs.includes("SH.primary_chain.spec") &&
+  appjs.includes("SH.primary_chain.steps") && appjs.includes("SH.primary_chain.figure_note"));
+
+/* storage / winterize: FSM §1 p. 1-8, both directions */
+eq("storage put-away has 10 steps", D.shop.storage.put_away.length, 10);
+eq("storage removal has 8 steps", D.shop.storage.removal.length, 8);
+check("storage step 2 offers stabilizer + drained carb OR drained tank + rust preventative",
+  D.shop.storage.put_away[1].includes("gasoline stabilizer") && D.shop.storage.put_away[1].includes("rust preventatives"));
+check("storage step 3 is plugs out, oil squirts, crank 5-6 revolutions",
+  D.shop.storage.put_away[2].includes("few squirts of engine oil") && D.shop.storage.put_away[2].includes("5–6 revolutions"));
+check("storage step 4 plugs the oil-tank line to the 90-degree pump fitting",
+  D.shop.storage.put_away[3].includes("90° fitting") && D.shop.storage.put_away[3].includes("check ball"));
+check("storage step 8 is battery out, charge every other month below 60F, monthly above",
+  D.shop.storage.put_away[7].includes("every other month") && D.shop.storage.put_away[7].includes("below 60°F") &&
+  D.shop.storage.put_away[7].includes("once a month") && D.shop.storage.put_away[7].includes("above 60°F"));
+check("storage step 10 is a breathing cover, never plastic",
+  D.shop.storage.put_away[9].includes("breathe") && D.shop.storage.put_away[9].includes("Plastic"));
+check("storage warns gasoline is flammable and the charger/battery explosion warnings are kept",
+  D.shop.storage.warnings.some((w) => w.includes("Gasoline is flammable")) &&
+  D.shop.storage.warnings.some((w) => w.includes("battery charger")) &&
+  D.shop.storage.warnings.some((w) => w.includes("explosive hydrogen gas")));
+check("storage removal starts with clutch-disengagement warning (gear, lever in, push back and forth)",
+  D.shop.storage.removal_warning.includes("place the transmission in gear") && D.shop.storage.removal_warning.includes("push the vehicle back and forth"));
+check("storage removal ends with the Owner's Manual pre-riding checklist",
+  D.shop.storage.removal[7].includes("PRE-RIDING CHECKLIST"));
+check("storage names the dealer/qualified-technician line from the manual",
+  D.shop.storage.dealer_note.includes("qualified technician"));
+check("storage ref cites FSM §1 p. 1-8", D.shop.storage.ref.includes("p. 1-8"));
+check("app.js storage card renders both directions and the warnings",
+  appjs.includes("SH.storage.put_away") && appjs.includes("SH.storage.removal") && appjs.includes("SH.storage.warnings"));
+
+/* brake pad replacement: FSM §2 pp. 2-40–2-43 (front), 2-47–2-48 (rear) */
+eq("brake pad front procedure has 9 steps", D.shop.brake_pads.front.steps.length, 9);
+eq("brake pad rear procedure has 7 steps", D.shop.brake_pads.rear.steps.length, 7);
+check("brake pad wear limit is 1/16 in (1.6 mm), replace the entire set (4)",
+  D.shop.brake_pads.wear_limit.includes("1/16 in. (1.6 mm)") && D.shop.brake_pads.wear_limit.includes("entire set (4)"));
+check("brake pads replaced in sets, front and rear, mismatched pads warned",
+  D.shop.brake_pads.sets_rule.includes("replaced in sets at the same time") && D.shop.brake_pads.sets_rule.includes("Rear brake pads must also be replaced in sets"));
+check("brake pad pump caution: pump pressure up BEFORE moving the motorcycle",
+  D.shop.brake_pads.pump_caution.includes("BEFORE moving motorcycle") && D.shop.brake_pads.pump_caution.includes("push the pads against the brake disc"));
+check("front pad step 3 is the 1/16 in inspection + alcohol cleaning, never gasoline",
+  D.shop.brake_pads.front.steps[2].includes("1/16 in. (1.6 mm)") && D.shop.brake_pads.front.steps[2].includes("Do not use gasoline"));
+check("front pad: insulator-backed pad on the spring clip, insulated back down; clip loop faces away from piston",
+  D.shop.brake_pads.front.steps[3].includes("insulator backing") && D.shop.brake_pads.front.steps[3].includes("insulated back facing downward") &&
+  D.shop.brake_pads.front.steps[4].includes("face away from the piston"));
+check("front retainer screw 40-50 in-lbs, inner pad without insulator backing",
+  D.shop.brake_pads.front.steps[5].includes("40-50 in-lbs") && D.shop.brake_pads.front.steps[5].includes("without insulator backing"));
+check("front mount: MOLY 44 pin, 25-30 ft-lbs pin and upper bolt",
+  D.shop.brake_pads.front.steps[6].includes("MOLY 44") && D.shop.brake_pads.front.steps[6].includes("25-30 ft-lbs"));
+check("front banjo bolt 17-22 ft-lbs with new washers, bleeder 80-100 in-lbs",
+  D.shop.brake_pads.front.steps[7].includes("17-22 ft-lbs") && D.shop.brake_pads.front.steps[7].includes("new banjo washers") &&
+  D.shop.brake_pads.front.steps[7].includes("80-100 in-lbs"));
+check("front reservoir fill is DOT 5 to 1/8 in below top, then bleed",
+  D.shop.brake_pads.front.steps[8].includes("D.O.T. 5") && D.shop.brake_pads.front.steps[8].includes("1/8 in. (3.2 mm) below top") &&
+  D.shop.brake_pads.front.steps[8].includes("Bleed the brake system"));
+check("front piston note: pressed all the way in for new pads; bushings must be in the lugs",
+  D.shop.brake_pads.front.piston_note.includes("pressed all the way into the bore") && D.shop.brake_pads.front.piston_note.includes("bushings are in the mounting lugs"));
+check("rear pad step 1 removes the muffler and rocks the caliper to compress the pistons",
+  D.shop.brake_pads.rear.steps[0].includes("Remove rear muffler") && D.shop.brake_pads.rear.steps[0].includes("rock caliper"));
+check("rear pad step 3: seal and dust boot replaced if removed, never hone or bore",
+  D.shop.brake_pads.rear.steps[2].includes("Always replace seal (5) and dust boot (7)") && D.shop.brake_pads.rear.steps[2].includes("Do not hone or bore cylinder"));
+check("rear pad: shims on the bracket, pad off the shim drags and damages the bracket",
+  D.shop.brake_pads.rear.steps[3].includes("tabs seated in mounting holes") && D.shop.brake_pads.rear.steps[3].includes("pad off the shim"));
+check("rear pin bolts 15-20 ft-lbs, banjo 17-22 ft-lbs, bleed, muffler back on",
+  D.shop.brake_pads.rear.steps[4].includes("15-20 ft-lbs") && D.shop.brake_pads.rear.steps[5].includes("17-22 ft-lbs") &&
+  D.shop.brake_pads.rear.steps[5].includes("Bleed the rear brake system") && D.shop.brake_pads.rear.steps[5].includes("Install rear muffler"));
+check("rear piston note: do not remove pistons without leakage or a bad piston; lever pumps piston to full travel",
+  D.shop.brake_pads.rear.piston_note.includes("Do not remove the pistons") && D.shop.brake_pads.rear.piston_note.includes("pump the brake lever until piston reaches its full travel"));
+check("burnish note prints BOTH manual distances — front 300 miles, rear 100 miles — as written, not reconciled",
+  D.shop.brake_pads.burnish_note.includes("300 miles") && D.shop.brake_pads.burnish_note.includes("100 miles (160 km)") &&
+  D.shop.brake_pads.burnish_note.includes("Both are printed here as written"));
+check("brake pad ref cites FSM §2 pp. 2-40–2-43 and 2-47–2-48",
+  D.shop.brake_pads.ref.includes("pp. 2-40–2-43") && D.shop.brake_pads.ref.includes("pp. 2-47–2-48"));
+check("app.js brake pad card renders wear limit, sets rule, pump caution, both calipers and the burnish note",
+  appjs.includes("SH.brake_pads.wear_limit") && appjs.includes("SH.brake_pads.sets_rule") &&
+  appjs.includes("SH.brake_pads.pump_caution") && appjs.includes("SH.brake_pads.front.steps") &&
+  appjs.includes("SH.brake_pads.rear.steps") && appjs.includes("SH.brake_pads.burnish_note"));
+
+/* fork oil change: FSM §1 p. 1-42; fluid §1 p. 1-9; capacities §1 p. 1-36 */
+eq("fork oil procedure has 6 steps", D.shop.fork_oil.steps.length, 6);
+check("fork oil is HYDRAULIC FORK OIL TYPE \"E\", Part No. 99884-80",
+  D.shop.fork_oil.fluid.includes("HYDRAULIC FORK OIL TYPE") && D.shop.fork_oil.fluid.includes("99884-80"));
+check("fork oil interval is every 10,000 miles or prior to storage",
+  D.shop.fork_oil.interval.includes("10,000 mile") && D.shop.fork_oil.interval.includes("prior to storage"));
+eq("fork oil has 2 capacity rows", D.shop.fork_oil.capacities.length, 2);
+eq("FXSTC wet capacity is 10.2 oz (302 ml)",
+  D.shop.fork_oil.capacities.find((c) => c.models.startsWith("FXSTC")).wet, "10.2 oz (302 ml)");
+eq("FLSTC/F wet capacity is 11.5 oz (340 ml)",
+  D.shop.fork_oil.capacities.find((c) => c.models.startsWith("FLSTC")).wet, "11.5 oz (340 ml)");
+check("fork oil step 1 supports the bike with the front end off the floor, forks fully extended",
+  D.shop.fork_oil.steps[0].includes("front end is off the floor") && D.shop.fork_oil.steps[0].includes("fully extended"));
+check("fork oil step 3 drains from the bottom and keeps the drain screw washer",
+  D.shop.fork_oil.steps[2].includes("drain screws from the bottom") && D.shop.fork_oil.steps[2].includes("Don't lose the drain screw washer"));
+check("fork oil step 6 tightens caps to 40-60 ft-lbs",
+  D.shop.fork_oil.steps[5].includes("40-60 ft-lbs"));
+check("fork oil capacities are WET only — no dry capacity is invented",
+  D.shop.fork_oil.note.includes("WET") && D.shop.fork_oil.note.includes("No DRY") && D.shop.fork_oil.note.includes("none is given here") &&
+  !JSON.stringify(D.shop.fork_oil.capacities).toLowerCase().includes("dry"));
+check("fork oil note: Springers have no hydraulic fork oil change in this procedure",
+  D.shop.fork_oil.note.includes("Springer") && D.shop.fork_oil.note.includes("except Springers"));
+check("fork oil ref cites §1 p. 1-42, p. 1-9 and p. 1-36",
+  D.shop.fork_oil.ref.includes("p. 1-42") && D.shop.fork_oil.ref.includes("p. 1-9") && D.shop.fork_oil.ref.includes("p. 1-36"));
+check("app.js fork oil card renders interval, fluid, steps, capacities and note",
+  appjs.includes("SH.fork_oil.interval") && appjs.includes("SH.fork_oil.fluid") && appjs.includes("SH.fork_oil.steps") &&
+  appjs.includes("SH.fork_oil.capacities") && appjs.includes("SH.fork_oil.note"));
+
+/* first 500-mile service: FSM §1 p. 1-1 + Scheduled Service Table pp. 1-34–1-37 */
+eq("first 500 check list (p. 1-1) has 8 items", D.shop.first_500.check_at_first_500.length, 8);
+eq("first 500 replace list has 4 items", D.shop.first_500.replace.length, 4);
+eq("first 500 perform list has 3 items", D.shop.first_500.perform.length, 3);
+eq("first 500 inspect list has 17 items", D.shop.first_500.inspect.length, 17);
+eq("first 500 lubricate list has 1 item", D.shop.first_500.lubricate.length, 1);
+eq("first 500 inspect+lubricate list has 1 item", D.shop.first_500.inspect_lubricate.length, 1);
+eq("first 500 tighten list has 1 item", D.shop.first_500.tighten.length, 1);
+eq("first 500 table column totals 27 items",
+  D.shop.first_500.replace.length + D.shop.first_500.perform.length + D.shop.first_500.inspect.length +
+  D.shop.first_500.lubricate.length + D.shop.first_500.inspect_lubricate.length + D.shop.first_500.tighten.length, 27);
+check("first 500 replaces engine oil, oil filter, primary lube and transmission lube",
+  ["Engine oil", "Engine oil filter", "Primary chaincase lubricant", "Transmission lubricant"].every((n) =>
+    D.shop.first_500.replace.some((r) => r.startsWith(n))));
+check("first 500 performs clutch adjustment, rocker bearing adjustment (Springers) and road test",
+  D.shop.first_500.perform.includes("Clutch adjustment") &&
+  D.shop.first_500.perform.some((p) => p.includes("Rocker bearing adjustment")) &&
+  D.shop.first_500.perform.includes("Road test"));
+check("first 500 inspects battery, primary chain, spokes, tires, fall-away, brake fluid, pads/discs, pedal height, belt, pivot bolts, shocks, air cleaner, fuel lines, enrichener, mounts, electrics, idle speed",
+  ["Battery", "Primary chain", "Spoke tightness", "Tire condition and pressure", "Steering head bearing fall-away",
+   "Brake fluid", "Brake pad linings and discs", "Rear brake pedal height", "Drive belt", "Rear fork pivot bolts",
+   "Rear shock absorbers", "Air cleaner", "Fuel system lines and fittings", "Enrichener control", "Engine mounts",
+   "Electrical components", "Engine idle speed"].every((n) => D.shop.first_500.inspect.some((i) => i.startsWith(n))));
+check("first 500 lubricates Springer steering head bearings and inspect+lubricates throttle cables, tightens fasteners except head bolts",
+  D.shop.first_500.lubricate[0].includes("Springer steering head bearings") &&
+  D.shop.first_500.inspect_lubricate[0] === "Throttle cables" &&
+  D.shop.first_500.tighten[0] === "Fasteners (except head bolts)");
+check("first 500 names what is NOT in the 500-mile column — fork oil, wheel bearings, lifter screen, plugs, timing",
+  D.shop.first_500.not_at_500.includes("front fork oil") && D.shop.first_500.not_at_500.includes("wheel bearings") &&
+  D.shop.first_500.not_at_500.includes("spark plugs") && D.shop.first_500.not_at_500.includes("10,000 mi"));
+check("first 500 dealer note: authorized dealer, warranty in force, emissions",
+  D.shop.first_500.dealer_note.includes("authorized Harley-Davidson dealer") &&
+  D.shop.first_500.dealer_note.includes("warranty in force") && D.shop.first_500.dealer_note.includes("emissions"));
+check("first 500 deferral note says the FSM points at the Owner's Manual list, which IS the table — nothing invented",
+  D.shop.first_500.deferral_note.includes("Owner's Manual") && D.shop.first_500.deferral_note.includes("IS the Scheduled Service Table") &&
+  D.shop.first_500.deferral_note.includes("does not print a separate 500-mile checklist"));
+check("first 500 p. 1-1 check list covers tires, belt, brakes/steering/throttle, fluid + pads, cables, fluid levels, spokes, lights",
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Tires for correct pressure")) &&
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Belt for proper tension")) &&
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Brakes, steering, and throttle")) &&
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Brake fluid level")) &&
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Cables for fraying")) &&
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Do not overfill oil tank")) &&
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Wheel spoke tightness")) &&
+  D.shop.first_500.check_at_first_500.some((i) => i.includes("Headlight, taillight")));
+check("first 500 ref cites §1 p. 1-1 and the table pp. 1-34–1-37",
+  D.shop.first_500.ref.includes("p. 1-1") && D.shop.first_500.ref.includes("pp. 1-34–1-37"));
+check("app.js first 500 card renders dealer note, deferral note, check list and all six groups",
+  appjs.includes("SH.first_500.dealer_note") && appjs.includes("SH.first_500.deferral_note") &&
+  appjs.includes("SH.first_500.check_at_first_500") && appjs.includes("SH.first_500.replace") &&
+  appjs.includes("SH.first_500.perform") && appjs.includes("SH.first_500.inspect") &&
+  appjs.includes("SH.first_500.lubricate") && appjs.includes("SH.first_500.inspect_lubricate") &&
+  appjs.includes("SH.first_500.tighten"));
+
+/* engine oil change: FSM §1 p. 1-38 */
+eq("engine oil procedure has 8 steps", D.shop.engine_oil.steps.length, 8);
+check("engine oil spec is 3 quarts (2.8 liters) in the tank",
+  D.shop.engine_oil.spec.includes("three (3) quarts") && D.shop.engine_oil.spec.includes("2.8 liters"));
+check("engine oil filter hand-tightens 1/2-3/4 turn after gasket contact",
+  D.shop.engine_oil.steps[3].includes("1/2-3/4 turn") && D.shop.engine_oil.steps[3].includes("gasket contacts"));
+check("engine oil level checked upright and level at operating temperature, never overfilled",
+  D.shop.engine_oil.steps[7].includes("upright and level") && D.shop.engine_oil.steps[7].includes("Do not overfill tank") && D.shop.engine_oil.steps[7].includes("air space"));
+eq("engine oil grade table has 4 rows", D.shop.engine_oil.oil_grades.length, 4);
+check("engine oil grades are 10W40 below 40F, 20W50 above 40F, SAE 50 above 60F, SAE 60 above 80F, all HD 240",
+  D.shop.engine_oil.oil_grades[0].viscosity === "SAE 10W40" && D.shop.engine_oil.oil_grades[0].lowest_ambient.includes("Below 40°F") &&
+  D.shop.engine_oil.oil_grades[1].viscosity === "SAE 20W50" && D.shop.engine_oil.oil_grades[1].lowest_ambient.includes("Above 40°F") &&
+  D.shop.engine_oil.oil_grades[2].viscosity === "SAE 50" && D.shop.engine_oil.oil_grades[2].lowest_ambient.includes("Above 60°F") &&
+  D.shop.engine_oil.oil_grades[3].viscosity === "SAE 60" && D.shop.engine_oil.oil_grades[3].lowest_ambient.includes("Above 80°F") &&
+  D.shop.engine_oil.oil_grades.every((g) => g.rating === "HD 240"));
+check("engine oil interval is 500 miles then every 5000, plus annually / prior to storage",
+  D.shop.engine_oil.interval.includes("500 mile") && D.shop.engine_oil.interval.includes("5000 mile") && D.shop.engine_oil.interval.includes("prior to storage or annually"));
+check("engine oil ref cites FSM §1 p. 1-38", D.shop.engine_oil.ref.includes("p. 1-38"));
+check("app.js engine oil card renders interval, spec, steps, grades and note",
+  appjs.includes("SH.engine_oil.interval") && appjs.includes("SH.engine_oil.spec") && appjs.includes("SH.engine_oil.steps") &&
+  appjs.includes("SH.engine_oil.oil_grades") && appjs.includes("SH.engine_oil.note"));
+
+/* transmission oil change: FSM §1 p. 1-41 */
+eq("transmission oil procedure has 4 steps", D.shop.transmission_oil.steps.length, 4);
+check("transmission oil spec is 24 oz (709.8 ml), dipstick dipped not screwed",
+  D.shop.transmission_oil.spec.includes("24 oz. (709.8 ml)") && D.shop.transmission_oil.spec.includes("dipped, not screwed"));
+check("transmission drain plug projects 0.16-0.18 in, never over-tightened",
+  D.shop.transmission_oil.steps[1].includes("0.16-0.18 in.") && D.shop.transmission_oil.steps[1].includes("Do not over-tighten"));
+check("transmission filler plug is finger tight",
+  D.shop.transmission_oil.steps[3].includes("finger tight"));
+check("transmission part-number conflict is flagged, not silently resolved — 98853-96 wired, 99892-84 named",
+  D.shop.transmission_oil.part_number_flag.includes("99892-84") && D.shop.transmission_oil.part_number_flag.includes("98853-96") &&
+  D.shop.transmission_oil.part_number_flag.includes("three FSM locations against one"));
+check("transmission oil interval is 500 miles then every 5000, plus annually / prior to storage",
+  D.shop.transmission_oil.interval.includes("500 mile") && D.shop.transmission_oil.interval.includes("5000 mile") && D.shop.transmission_oil.interval.includes("prior to storage or annually"));
+check("transmission oil ref cites FSM §1 p. 1-41", D.shop.transmission_oil.ref.includes("p. 1-41"));
+check("app.js transmission oil card renders interval, spec, steps and the part-number flag",
+  appjs.includes("SH.transmission_oil.interval") && appjs.includes("SH.transmission_oil.spec") &&
+  appjs.includes("SH.transmission_oil.steps") && appjs.includes("SH.transmission_oil.part_number_flag"));
+
+/* primary chaincase oil change: FSM §1 pp. 1-39–1-40 */
+eq("primary oil procedure has 5 steps", D.shop.primary_oil.steps.length, 5);
+check("primary oil is Primary Chaincase Lubricant 99887-84 (qt) / 99886-84 (gal)",
+  D.shop.primary_oil.spec.includes("99887-84") && D.shop.primary_oil.spec.includes("99886-84"));
+check("primary oil level is the bottom edge of the diaphragm spring — 1997 ~32 oz, 1998 ~26 oz",
+  D.shop.primary_oil.spec.includes("bottom edge of the diaphragm spring") && D.shop.primary_oil.spec.includes("1997 Models: approximately 32 oz") &&
+  D.shop.primary_oil.spec.includes("1998 Models: approximately 26 oz"));
+check("primary oil caution is over-fill drags the clutch and hides neutral",
+  D.shop.primary_oil.caution.includes("Do not over-fill") && D.shop.primary_oil.caution.includes("difficulty in finding neutral"));
+check("primary oil note soaks new discs five minutes",
+  D.shop.primary_oil.note.includes("minimum of five minutes"));
+check("primary oil interval is 500 miles then every 5000, with NO annual/storage leg (the table row carries no *)",
+  D.shop.primary_oil.interval.includes("500 mile") && D.shop.primary_oil.interval.includes("5000 mile") && !D.shop.primary_oil.interval.includes("prior to storage"));
+check("primary oil ref cites FSM §1 pp. 1-39–1-40", D.shop.primary_oil.ref.includes("pp. 1-39–1-40"));
+check("app.js primary oil card renders interval, spec, steps, caution and note",
+  appjs.includes("SH.primary_oil.interval") && appjs.includes("SH.primary_oil.spec") && appjs.includes("SH.primary_oil.steps") &&
+  appjs.includes("SH.primary_oil.caution") && appjs.includes("SH.primary_oil.note"));
+
+/* brake fluid bleed & flush: FSM §2 p. 2-49; §1 p. 1-42 */
+eq("brake fluid flush procedure has 4 steps", D.shop.brake_fluid_flush.steps.length, 4);
+check("brake fluid is DOT 5 silicone ONLY, Part No. 99902-77 — never DOT 3 or 4",
+  D.shop.brake_fluid_flush.spec.includes("D.O.T. 5 SILICONE") && D.shop.brake_fluid_flush.spec.includes("99902-77") &&
+  D.shop.brake_fluid_flush.spec.includes("NEVER DOT 3 or DOT 4"));
+check("brake fluid reservoir level is 1/8 in below the gasket surface",
+  D.shop.brake_fluid_flush.spec.includes("1/8 in. (3.2 mm) below the gasket surface"));
+check("brake fluid interval is inspect-only — the FSM prints NO replacement interval",
+  D.shop.brake_fluid_flush.interval.includes("inspect the brake fluid level and condition") &&
+  D.shop.brake_fluid_flush.interval.includes("NO scheduled brake-fluid replacement interval"));
+check("brake bleed step 4: never reuse fluid, bleeder 80-100 in-lbs",
+  D.shop.brake_fluid_flush.steps[3].includes("Do not reuse fluid") && D.shop.brake_fluid_flush.steps[3].includes("80-100 in-lbs"));
+check("brake fluid warning: open a line and the system must be bled — spongy pedal, possible personal injury",
+  D.shop.brake_fluid_flush.warning.includes("must be bled") && D.shop.brake_fluid_flush.warning.includes("spongy feel"));
+check("brake fluid after-service test is slow speed on dry, clean pavement",
+  D.shop.brake_fluid_flush.after_service.includes("dry, clean pavement") && D.shop.brake_fluid_flush.after_service.includes("slow speeds"));
+check("brake fluid reservoir cover screws are 6-8 in-lbs",
+  D.shop.brake_fluid_flush.reservoir.includes("6-8 in-lbs"));
+check("brake fluid ref cites FSM §2 p. 2-49 and §1 p. 1-42",
+  D.shop.brake_fluid_flush.ref.includes("p. 2-49") && D.shop.brake_fluid_flush.ref.includes("p. 1-42"));
+check("app.js brake fluid card renders interval, spec, steps, warnings and reservoir",
+  appjs.includes("SH.brake_fluid_flush.interval") && appjs.includes("SH.brake_fluid_flush.spec") &&
+  appjs.includes("SH.brake_fluid_flush.steps") && appjs.includes("SH.brake_fluid_flush.warning") &&
+  appjs.includes("SH.brake_fluid_flush.after_service") && appjs.includes("SH.brake_fluid_flush.reservoir"));
 
 /* pre-ride: Clymer 12 + Sportster lights detail, T-CLOCS structure labeled */
 eq("pre-ride has 6 T-CLOCS groups", D.shop.preride.groups.length, 6);
@@ -876,8 +1512,8 @@ check("sw-update.js vendored byte-identical to canonical",
    wizard + safety block + Sportster numbers --- */
 const smokeTree = D.trees.find((t) => t.id === "smoking-oil-consumption");
 check("smoking tree present", !!smokeTree);
-eq("smoking tree has 10 steps", smokeTree.steps.length, 10);
-eq("smoking tree has 9 causes", smokeTree.causes.length, 9);
+eq("smoking tree has 11 steps", smokeTree.steps.length, 11);
+eq("smoking tree has 10 causes", smokeTree.causes.length, 10);
 eq("smoking weights sum to 100", smokeTree.causes.reduce((n, c) => n + c.weight, 0), 100);
 check("smoking causes all carry their source", smokeTree.causes.every((c) => !!c.source));
 check("smoking over-rev cause is flagged NOT an FSM cause (Easyriders Vol. 3)",
@@ -894,7 +1530,7 @@ const smokeBase = {};
 smokeTree.causes.forEach((c) => { smokeBase[c.cause] = c.weight; });
 function smokeBump(key) { return S.applyAnswer(smokeBase, smokeTree.causes, key, true); }
 check("smoking rings yes bumps only the rings cause by 15",
-  smokeBump("rings")["Worn, broken, or stuck piston rings"] - 25 === 15 &&
+  smokeBump("rings")["Worn, broken, or stuck piston rings"] - 20 === 15 &&
   smokeTree.causes.filter((c) => !c.cause.includes("piston rings")).every((c) => smokeBump("rings")[c.cause] === c.weight));
 check("smoking seals yes bumps only the guide-seals cause, NOT the over-rev cause",
   smokeBump("seals")["Valve guide seals damaged, or stem-to-guide clearance excessive"] - 10 === 15 &&
@@ -912,6 +1548,179 @@ check("smoking exhaust-valve / intake-valve yes bump only their own valve cause"
 check("smoking overfill / carryover yes bump only their own cause",
   smokeBump("overfill")["Oil overfill"] - 5 === 15 &&
   smokeBump("carryover")["Oil carryover, clogged oil return passages, or head casting porosity"] - 5 === 15);
+
+/* --- round 3 (Nov 25, 2026): trouble-manual gap-fills ---
+   Verified in sportster-86-03-trouble before wiring: seized-engine list
+   (PDF p. 3, items 11-13), starter voltage drops <1V / <1V / <0.2V
+   (PDF p. 7), vacuum-petcock bench test 25 in-Hg, flow on + reserve,
+   stop on release, repeat 5x (PDF pp. 56-57), leakdown >12% rule
+   (PDF pp. 58-59), float-bowl tap test (PDF p. 30).
+   Rebalances (both trees stay at 100): no-start battery 25->20 funds
+   the seized cause at 5 — battery stays second-highest behind ignition
+   at 25, and 5 matches the other rare end-of-line causes (vacuum,
+   stuck weights, screens). Smoking rings 25->20 funds the leakdown
+   >12% cause at 5 — rings stays the top cause ahead of the two valve
+   causes at 15, and the new factory verdict absorbs part of the
+   top-end-fault space rings used to monopolize. The rich/flood tap
+   test is a procedure tightening of the existing float cause — no new
+   cause, no weight change. */
+const nsTree3 = D.trees.find((t) => t.id === "no-start");
+const nsBase3 = {};
+nsTree3.causes.forEach((c) => { nsBase3[c.cause] = c.weight; });
+check("round 3 no-start rebalance: battery 25->20, seized cause at 5, tree still 100",
+  nsTree3.causes.find((c) => c.cause.includes("Battery discharged")).weight === 20 &&
+  nsTree3.causes.find((c) => c.cause.includes("Seized engine")).weight === 5 &&
+  nsTree3.causes.reduce((n, c) => n + c.weight, 0) === 100);
+check("round 3 seized cause is critical, cites trouble p. 3 items 11-13",
+  nsTree3.causes.some((c) => c.cause.includes("Seized engine") && c.urgency === "critical" &&
+    c.source.includes("Sportster 1986-2003 Troubleshooting Manual") && c.source.includes("PDF p. 3") &&
+    c.test.includes("seized piston") && c.test.includes("broken connecting rod")));
+check("round 3 seized step is last and cites trouble p. 3",
+  nsTree3.steps[nsTree3.steps.length - 1].yes === "seized" &&
+  nsTree3.steps[nsTree3.steps.length - 1].cite.includes("PDF p. 3"));
+check("round 3 seized yes bumps only the seized cause by 15",
+  S.applyAnswer(nsBase3, nsTree3.causes, "seized", true)["Seized engine — piston, crankshaft bearings, or broken connecting rod"] - 5 === 15 &&
+  nsTree3.causes.filter((c) => !c.cause.includes("Seized engine")).every((c) => S.applyAnswer(nsBase3, nsTree3.causes, "seized", true)[c.cause] === c.weight));
+check("round 3 starter cause carries the <1V / <1V / <0.2V drops and the Clymer figure",
+  nsTree3.causes.some((c) => c.cause.includes("Starter or cables") &&
+    c.test.includes("under 1 V") && c.test.includes("under 0.2 V") && c.test.includes("Clymer p. 47") &&
+    c.source.includes("PDF p. 7")));
+check("round 3 vacuum cause is now the full bench test, 25 in-Hg, 5 repeats",
+  nsTree3.causes.some((c) => c.cause.includes("Vacuum petcock") &&
+    c.test.includes("25 in. (635 mm) Hg") && c.test.includes("repeat 5 times") &&
+    c.test.includes("Never exceed the specified vacuum") &&
+    c.source.includes("PDF pp. 56") && !c.source.includes("not yet added")));
+check("round 3 smoking rebalance: rings 25->20, leakdown >12% cause at 5, tree still 100",
+  smokeTree.causes.find((c) => c.cause.includes("piston rings")).weight === 20 &&
+  smokeTree.causes.find((c) => c.cause.includes("Poor engine condition")).weight === 5 &&
+  smokeTree.causes.reduce((n, c) => n + c.weight, 0) === 100);
+check("round 3 leakdown >12% cause cites trouble pp. 58-59 and names the listen-for-the-leak sites",
+  smokeTree.causes.some((c) => c.cause.includes("Poor engine condition") &&
+    c.source.includes("PDF pp. 58") && c.test.includes("more than 12%") &&
+    c.test.includes("exhaust = exhaust valve") && c.test.includes("timing inspection hole")));
+check("round 3 leakdown step sits after the three localization steps and cites pp. 58-59",
+  smokeTree.steps[8].yes === "poor-condition" && smokeTree.steps[8].cite.includes("PDF pp. 58"));
+check("round 3 poor-condition yes bumps only the poor-condition cause by 15",
+  smokeBump("poor-condition")["Poor engine condition — leakdown loss differs by more than 12% between cylinders"] - 5 === 15 &&
+  smokeTree.causes.filter((c) => !c.cause.includes("Poor engine condition")).every((c) => smokeBump("poor-condition")[c.cause] === c.weight));
+check("round 3 rich/flood float cause carries the tap test from trouble p. 30",
+  richTree.causes.some((c) => c.cause.includes("Float level") &&
+    c.test.includes("lightly tap the float bowl") && c.test.includes("overflow tube") &&
+    c.source.includes("PDF p. 30")));
+check("round 3 rich/flood step 1 note carries the tap test and cites trouble p. 30",
+  richTree.steps[0].note.includes("tap test") && richTree.steps[0].cite.includes("PDF p. 30"));
+
+/* --- round 3 (Nov 25, 2026): CV carb rebuild Shop card ---
+   FSM #99482-98 §4 pp. 4-14–4-18, read from the FSM text (OCR clean;
+   p. 4-15 is the exploded Figure 4-12, no text steps depend on it).
+   Removal 7 steps, installation 8 steps, disassembly (vacuum piston 3,
+   carb body 4, accel pump 1), cleaning (vacuum piston 5, carb body 10),
+   float replacement, assembly (vacuum piston 6, carb body 6, accel pump 1).
+   Assembly + cleaning are wired too, from the same pages — a rebuild card
+   that only disassembles is a trap. Nothing left out: every step on
+   pp. 4-14–4-18 is in the card. */
+const carbRebuild = D.shop.carb_rebuild;
+check("carb rebuild card exists", !!carbRebuild);
+check("carb rebuild ref cites FSM §4 pp. 4-14–4-18",
+  carbRebuild.ref.includes("§4") && carbRebuild.ref.includes("4-14") && carbRebuild.ref.includes("4-18"));
+check("carb rebuild carries the gasoline warning",
+  carbRebuild.warning.includes("extremely flammable"));
+eq("carb rebuild removal has 7 steps", carbRebuild.removal.length, 7);
+eq("carb rebuild installation has 8 steps", carbRebuild.installation.length, 8);
+check("carb rebuild installation torques the manifold capscrews 15-17 ft-lbs",
+  carbRebuild.installation.some((s) => s.includes("15-17 ft-lbs")));
+check("carb rebuild installation warns against tightening before aligning",
+  carbRebuild.installation_caution.includes("Do not tighten capscrews"));
+check("carb rebuild disassembly covers vacuum piston, carb body, accel pump",
+  carbRebuild.disassembly_vacuum_piston.length === 3 &&
+  carbRebuild.disassembly_carb_body.length === 4 &&
+  carbRebuild.disassembly_accel_pump.length === 1);
+check("carb rebuild cleaning warns against acid-dipping the inlet valve",
+  carbRebuild.cleaning_caution.includes("cold acid dip"));
+check("carb rebuild float note names the ROUNDED interference-fit pedestal",
+  carbRebuild.float_note.includes("ROUNDED pedestal") && carbRebuild.float_note.includes("INTERFERENCE SIDE"));
+check("carb rebuild assembly warns fixed-venturi slow jets must not go in a CVH",
+  carbRebuild.assembly_carb_body_caution.includes("must not be installed on CVH"));
+check("carb rebuild assembly seats the diaphragm evenly and checks piston rise",
+  carbRebuild.assembly_vacuum_piston.some((s) => s.includes("diaphragm is seated evenly")) &&
+  carbRebuild.assembly_vacuum_piston.some((s) => s.includes("rise to top smoothly")));
+check("app.js renders the carb rebuild card",
+  appjs.includes("$(\"carb-rebuild\")") && appjs.includes("SH.carb_rebuild.removal") && appjs.includes("SH.carb_rebuild.assembly_carb_body"));
+check("index.html has the carb rebuild card + Shop intro lists it",
+  html.includes('id="carb-rebuild"') && html.includes("CV carburetor rebuild"));
+
+/* --- round 3 (Nov 25, 2026): tree year-gating ---
+   gating.js is pure: bikeYear parses the year out of the roster name,
+   gateTreeText narrows the speedometer + turn-signal trees to the
+   picked bike's year. A picked 1995 bike sees only the 1995-96 split;
+   a picked 1990 (or 1947) bike — a year no split in either tree covers
+   — sees everything, as today; no bike picked sees everything. Tree
+   data wording is untouched — gating only hides segments at display
+   time. The shared report and saved sessions keep the full text. */
+const G = require("./gating.js");
+const speedoTree3 = D.trees.find((t) => t.id === "speedometer-inoperative");
+const signalsTree3 = D.trees.find((t) => t.id === "turn-signals");
+check("gating: roster years parse — 1995, 1990, 1947",
+  G.bikeYear(D.roster[0]) === 1995 && G.bikeYear(D.roster[1]) === 1990 && G.bikeYear(D.roster[2]) === 1947);
+check("gating: a bike with no year in its name parses to null (show everything)",
+  G.bikeYear({ name: "My Sportster" }) === null && G.bikeYear(null) === null);
+check("gating: speedo tree covers 1995-2003, not 1990 or 1947",
+  G.treeCoversYear(speedoTree3, 1995) && G.treeCoversYear(speedoTree3, 1999) &&
+  !G.treeCoversYear(speedoTree3, 1990) && !G.treeCoversYear(speedoTree3, 1947));
+check("gating: turn-signals tree covers 1991-2003, not 1990",
+  G.treeCoversYear(signalsTree3, 1991) && G.treeCoversYear(signalsTree3, 1999) &&
+  !G.treeCoversYear(signalsTree3, 1990));
+check("gating: picked 1995 bike — speedo step 3 shows only the 1995-96 split",
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, 1995).text.includes("8-12 V on 1995-96") &&
+  !G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, 1995).text.includes("1997-98"));
+check("gating: picked 1997 bike — speedo step 3 shows only the 1997-98 split",
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, 1997).text.includes("6-12 V on 1997-98") &&
+  !G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, 1997).text.includes("1995-96"));
+check("gating: picked 1990 bike — speedo step 3 shows all splits (out of range)",
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, 1990).text === speedoTree3.steps[2].q);
+check("gating: no bike picked — speedo step 3 shows all splits",
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, null).text === speedoTree3.steps[2].q);
+check("gating: picked 1995 bike — turn-signal cancel cause shows only the 1991-96 + 1995-96 segments",
+  G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1995).text.includes("1995-96 — voltmeter") &&
+  !G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1995).text.includes("1997-98") &&
+  !G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1995).text.includes("1999-2003"));
+check("gating: picked 1997 bike — cancel cause shows only the 1997-98 segment",
+  G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1997).text.includes("1997-98 (except late-98 883)") &&
+  !G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1997).text.includes("1991-96"));
+check("gating: picked 1999 bike — cancel cause shows only the 1999-2003 segment",
+  G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1999).text.includes("1999-2003") &&
+  !G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1999).text.includes("1991-96"));
+check("gating: picked 1994 bike — cancel cause shows the 1994 ohmmeter check, not the 1995-96 voltmeter check",
+  G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1994).text.includes("1994 models — ohmmeter") &&
+  !G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1994).text.includes("1995-96"));
+check("gating: picked 1990 bike — cancel cause shows all splits (out of range)",
+  G.gateTreeText("turn-signals", signalsTree3, signalsTree3.causes[0].test, 1990).text === signalsTree3.causes[0].test);
+check("gating: picked 1995 bike — odometer cause hides the 1997-98 and 1999-2003 jumper instructions",
+  !G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[1].test, 1995).text.includes("1997-98") &&
+  !G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[1].test, 1995).text.includes("1999-2003"));
+check("gating: picked 1997 bike — odometer cause shows the 1997-98 jumper instruction, not 1999-2003",
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[1].test, 1997).text.includes("1997-98: cut the leads") &&
+  !G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[1].test, 1997).text.includes("1999-2003"));
+check("gating: picked 1995 bike — speed-sensor cause hides the 1999-only note; 1999 shows it",
+  !G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[4].test, 1995).text.includes("1999 models") &&
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[4].test, 1999).text.includes("1999 models"));
+check("gating: picked 1995 bike — speedo-power cause shows only the 8-12 V (1995-96) feed",
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[2].test, 1995).text.includes("8-12 V (1995-96)") &&
+  !G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.causes[2].test, 1995).text.includes("6-12 V"));
+check("gating: non-gated trees pass through untouched whatever the bike",
+  G.gateTreeText("no-start", D.trees.find((t) => t.id === "no-start"), D.trees.find((t) => t.id === "no-start").steps[0].q, 1995).text ===
+  D.trees.find((t) => t.id === "no-start").steps[0].q);
+check("gating: tree data wording is untouched (gating hides at display time only)",
+  speedoTree3.steps[2].q.includes("1995-96") && speedoTree3.steps[2].q.includes("1997-98") &&
+  signalsTree3.causes[0].test.includes("1997-98") && signalsTree3.causes[0].test.includes("1999-2003"));
+check("gating: hidden flag is true when a split is hidden, false when nothing is",
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, 1995).hidden === true &&
+  G.gateTreeText("speedometer-inoperative", speedoTree3, speedoTree3.steps[2].q, 1990).hidden === false);
+check("app.js wires gating into the step walk and the results",
+  appjs.includes("ED_Gating") && appjs.includes("gateTreeText") && appjs.includes("currentBikeYear") &&
+  appjs.includes("gateNoteHtml"));
+check("index.html loads gating.js before app.js",
+  html.indexOf('src="gating.js"') !== -1 && html.indexOf('src="gating.js"') < html.indexOf('src="app.js"'));
 
 /* --- shareable report (ED_Report.build, pure) --- */
 const R = require("./report.js");
@@ -939,16 +1748,18 @@ check("wizard engine suggests the smoking tree", W.suggest("engine", "routine", 
 eq("wizard electrical suggests 4 trees", W.suggest("electrical", "routine", D.trees).length, 4);
 eq("wizard fuel suggests the two carb trees", W.suggest("fuel", "routine", D.trees).map((t) => t.id).join(","), "carb-lean-idle,carb-rich-flood");
 eq("wizard brakes suggests 1 tree", W.suggest("brakes", "routine", D.trees).length, 1);
-eq("wizard other suggests all 14 trees", W.suggest("other", "routine", D.trees).length, 14);
-eq("wizard unknown area suggests all trees (never empty)", W.suggest("nonsense", "routine", D.trees).length, 14);
+eq("wizard other suggests all 19 trees", W.suggest("other", "routine", D.trees).length, 19);
+eq("wizard unknown area suggests all trees (never empty)", W.suggest("nonsense", "routine", D.trees).length, 19);
 check("wizard roadside puts every critical-cause tree before every non-critical tree",
   (() => {
     const list = W.suggest("other", "roadside", D.trees);
     const rank = (t) => t.causes.some((c) => c.urgency === "critical") ? 0 : 1;
     return list.every((t, i) => i === 0 || rank(list[i - 1]) <= rank(t));
   })());
-check("wizard roadside actually reorders (brakes, with critical causes, moves up)",
-  W.suggest("other", "roadside", D.trees)[0].id === "brakes");
+check("wizard roadside actually reorders (critical-cause trees move up; no-start now leads — the seized-engine cause is critical)",
+  W.suggest("other", "roadside", D.trees)[0].id === "no-start" &&
+  W.suggest("other", "roadside", D.trees).findIndex((t) => t.id === "brakes") <
+  W.suggest("other", "routine", D.trees).findIndex((t) => t.id === "brakes"));
 check("wizard routine order is the data order (no reorder)", W.suggest("other", "routine", D.trees)[0].id === D.trees[0].id);
 eq("wizard describe reads back area/when/urgency", W.describe("engine", "idle", "roadside"), "Engine · at idle · Roadside — right now");
 check("index.html has the wizard card (area/when/urgency + go + results)",
@@ -1049,6 +1860,83 @@ check("app.js renders all three Sportster cards",
   ["sportster-jetting", "sportster-tires", "sportster-fork-oil"].every((id) => appjs.includes("$(\"" + id + "\")")));
 check("app.js labels the Sportster cards Clymer, never a correction to Softail numbers",
   appjs.includes("never a correction to the Softail CV40 numbers") && appjs.includes("Clymer (aftermarket). Sportster only"));
+
+/* --- Knucklehead engine (serial) decode, v17 — Knucklehead 1940-1947
+     Service Manual p. 3, read visually Nov 25, 2026. Format: 2-digit
+     year (40-47) + model code + serial. Evo year codes never apply. --- */
+const kManual = V.decodeKnucklehead("46 EL 2222");
+eq("manual example 46 EL 2222 decodes to 1946", kManual.year, 1946);
+eq("manual example model is EL", kManual.modelCode, "EL");
+eq("manual example serial is 2222", kManual.serialNumber, "2222");
+eq("manual example EL is the 61 high-compression O.H.V.", kManual.model, "61 Cu. In. O.H.V. Twin — high compression, 7.0 to 1");
+const kJosh = V.decodeKnucklehead("47FL6216");
+eq("Joshua's bike 47FL6216 decodes to 1947", kJosh.year, 1947);
+eq("47FL6216 model is FL", kJosh.modelCode, "FL");
+eq("47FL6216 serial is 6216", kJosh.serialNumber, "6216");
+eq("47FL6216 FL is the 74 high-compression O.H.V.", kJosh.model, "74 Cu. In. O.H.V. Twin — high compression, 7.0 to 1");
+check("47FL6216 cites manual p. 3", kJosh.source.includes("p. 3"));
+check("Knucklehead decode accepts spaces and lowercase", V.decodeKnucklehead("47 fl 6216").year === 1947 && V.decodeKnucklehead("47 fl 6216").modelCode === "FL");
+eq("E is the 61 low-compression O.H.V.", V.decodeKnucklehead("40E1000").model, "61 Cu. In. O.H.V. Twin — low compression, 6.5 to 1");
+eq("F is the 74 low-compression O.H.V.", V.decodeKnucklehead("41F1000").model, "74 Cu. In. O.H.V. Twin — low compression, 6.6 to 1");
+eq("U is the 74 side valve", V.decodeKnucklehead("42U1000").model, "74 Cu. In. Side Valve Twin — low compression, 5.0 to 1");
+eq("UL is the 74 side valve high compression", V.decodeKnucklehead("43UL1000").model, "74 Cu. In. Side Valve Twin — high compression, 5.5 to 1");
+eq("UH is the 80 side valve", V.decodeKnucklehead("44UH1000").model, "80 Cu. In. Side Valve Twin — low compression, 5.2 to 1");
+eq("ULH is the 80 side valve high compression", V.decodeKnucklehead("45ULH1000").model, "80 Cu. In. Side Valve Twin — high compression, 5.7 to 1");
+check("all 8 p. 3 model codes decode", ["E", "EL", "F", "FL", "U", "UL", "UH", "ULH"].every((c) => V.KNUCKLEHEAD_MODELS[c]));
+const kUnknown = V.decodeKnucklehead("47XX1234");
+check("unknown model code XX is flagged unknown, never guessed", kUnknown.unknownModel === true && kUnknown.model === null);
+eq("unknown model still parses the year", kUnknown.year, 1947);
+eq("unknown model still parses the serial", kUnknown.serialNumber, "1234");
+check("unknown model note says it is not guessed", kUnknown.note.includes("NOT in the manual's p. 3 table"));
+check("malformed serial (no serial digits) errors", V.decodeKnucklehead("47FL").error.includes("year + model + serial"));
+check("malformed serial (letters only) errors", V.decodeKnucklehead("FL").error.includes("year + model + serial"));
+check("malformed serial (empty) errors", !!V.decodeKnucklehead("").error);
+check("year outside 40-47 errors (1939)", V.decodeKnucklehead("39FL1234").error.includes("1940–1947 only"));
+check("year outside 40-47 errors (1948)", V.decodeKnucklehead("48FL1234").error.includes("1940–1947 only"));
+check("a 17-digit VIN passed to the Knucklehead decoder is refused, not misread", V.decodeKnucklehead("1HD1BJL41VY010000").error.includes("17-digit VIN"));
+check("Evo year codes are NOT applied: 47FL6216 year comes from the leading digits, not a position-10 letter",
+  kJosh.year === 1947 && !("yearCode" in kJosh));
+check("Knucklehead data block cites manual p. 3", D.vin.knucklehead.source.includes("p. 3"));
+eq("Knucklehead data block worked example is Joshua's bike", D.vin.knucklehead.worked_example.serial, "47FL6216");
+eq("Knucklehead data block worked example year", D.vin.knucklehead.worked_example.year, 1947);
+check("vin.js and data.js agree on all 8 Knucklehead model codes",
+  Object.keys(V.KNUCKLEHEAD_MODELS).sort().join(",") === Object.keys(D.vin.knucklehead.model_codes).sort().join(",") &&
+  Object.keys(V.KNUCKLEHEAD_MODELS).every((c) => V.KNUCKLEHEAD_MODELS[c] === D.vin.knucklehead.model_codes[c]));
+
+/* --- Knucklehead tire pressures, v17 — manual p. 3 table, read visually.
+     NOTE: the second size is 5.00" x 16", NOT 5.00 x 18. --- */
+const kt = D.knucklehead_tire_pressures.rows;
+eq("Knucklehead tire table has 8 rows (4 loads x 2 sizes)", kt.length, 8);
+check("Knucklehead tire table cites manual p. 3", D.knucklehead_tire_pressures.source.includes("p. 3"));
+const ktSolo400 = kt.find((r) => r.load === "Solo — Rider Only" && r.tire === "4.00\" x 18\" Tire");
+eq("solo 4.00x18 front/rear", ktSolo400.front + "/" + ktSolo400.rear, "14/16");
+const ktSolo500 = kt.find((r) => r.load === "Solo — Rider Only" && r.tire === "5.00\" x 16\" Tire");
+eq("solo 5.00x16 front/rear", ktSolo500.front + "/" + ktSolo500.rear, "12/14");
+check("no 5.00x18 row exists in the Knucklehead table — the page prints 5.00x16",
+  !kt.some((r) => r.tire.includes("5.00") && r.tire.includes("18")));
+const ktTwoUp400 = kt.find((r) => r.load === "Solo — Rider and One Passenger" && r.tire === "4.00\" x 18\" Tire");
+eq("two-up 4.00x18 front/rear", ktTwoUp400.front + "/" + ktTwoUp400.rear, "18/26");
+const ktTwoUp500 = kt.find((r) => r.load === "Solo — Rider and One Passenger" && r.tire === "5.00\" x 16\" Tire");
+eq("two-up 5.00x16 front/rear", ktTwoUp500.front + "/" + ktTwoUp500.rear, "12/16");
+const ktSide400 = kt.find((r) => r.load.startsWith("Sidecar") && r.tire === "4.00\" x 18\" Tire");
+eq("sidecar 4.00x18 front/rear/sidecar", ktSide400.front + "/" + ktSide400.rear + "/" + ktSide400.sidecar, "20/24/14");
+const ktSide500 = kt.find((r) => r.load.startsWith("Sidecar") && r.tire === "5.00\" x 16\" Tire");
+eq("sidecar 5.00x16 front/rear/sidecar", ktSide500.front + "/" + ktSide500.rear + "/" + ktSide500.sidecar, "14/16/14");
+const ktTruck400 = kt.find((r) => r.load.startsWith("Package Truck") && r.tire === "4.00\" x 18\" Tire");
+eq("package truck 4.00x18 front/rear/truck", ktTruck400.front + "/" + ktTruck400.rear + "/" + ktTruck400.packageTruck, "22/30/16");
+const ktTruck500 = kt.find((r) => r.load.startsWith("Package Truck") && r.tire === "5.00\" x 16\" Tire");
+eq("package truck 5.00x16 front/rear/truck", ktTruck500.front + "/" + ktTruck500.rear + "/" + ktTruck500.packageTruck, "14/20/14");
+check("Knucklehead tire note carries the overload rule from the page",
+  D.knucklehead_tire_pressures.note.includes("rear tire 2 lbs") && D.knucklehead_tire_pressures.note.includes("front tire 1 lb"));
+check("index.html has the Knucklehead serial card + tire card",
+  html.includes('id="knuck-input"') && html.includes('id="knuck-decode"') && html.includes('id="knuck-result"') && html.includes('id="knucklehead-tires"'));
+check("index.html cites the Knucklehead manual p. 3 on the serial card",
+  html.includes("Knucklehead 1940"));
+check("app.js wires the Knucklehead decode button and renders the tire card",
+  appjs.includes("decodeKnucklehead") && appjs.includes("$(\"knucklehead-tires\")"));
+check("no Knucklehead torque value anywhere — the manual has none",
+  !JSON.stringify(D.knucklehead_tire_pressures).toLowerCase().includes("ft-lb") &&
+  !fs.readFileSync(path.join(__dirname, "vin.js"), "utf8").toLowerCase().includes("ft-lb"));
 
 console.log(pass + "/" + (pass + fail) + " tests passed");
 if (fail) process.exit(1);

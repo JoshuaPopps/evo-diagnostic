@@ -1,7 +1,7 @@
 {
  "built": "2026-11-24",
  "source": "NHTSA (U.S. federal public domain, no key)",
- "note": "ODI flat files unreachable (www-odi.nhtsa.dot.gov DNS dead from VM + Umbrel); built from recalls/complaints APIs + static TSB chunk instead. Recalls use the recalls table's coarse families; a campaign may cover several model years. App must link out to nhtsa.gov/recalls for per-VIN repair status \u2014 no open API reports whether a specific VIN was fixed.",
+ "note": "ODI flat files unreachable; built from recalls/complaints APIs + static TSB chunk instead. Recalls use the recalls table's coarse families; a campaign may cover several model years. App must link out to nhtsa.gov/recalls for per-VIN repair status \u2014 no open API reports whether a specific VIN was fixed.",
  "recalls": [
   {
    "campaign": "90V002000",

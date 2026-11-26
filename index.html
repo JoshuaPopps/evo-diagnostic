@@ -41,6 +41,10 @@
   .ed-part{cursor:pointer}
   .ed-part:hover rect,.ed-part:hover polygon{stroke:var(--purple,#9d6bff);stroke-width:3}
   .ed-part:hover text{fill:#fff}
+  .ed-photo-map{position:relative}
+  .ed-photo-map img{display:block;width:100%}
+  .ed-photo-spot{position:absolute;padding:0;background:transparent;border:2px dashed rgba(157,107,255,.45);border-radius:8px;cursor:pointer}
+  .ed-photo-spot:hover,.ed-photo-spot:focus-visible{border:2px solid var(--purple,#9d6bff);background:rgba(157,107,255,.12);outline:none}
   video.ed-clip{max-width:100%;border-radius:8px}
   .ed-bar-row{display:flex;align-items:center;gap:8px;margin:4px 0}
   .ed-bar-row .ed-bar-label{flex:0 0 45%}
@@ -57,7 +61,7 @@
   <header>
     <p class="ed-note">Pocket Garage &middot; Shop Sheet N&ordm; 8</p>
     <h1>The Evo Diagnostic</h1>
-    <p class="ed-note">Photo, video and sound diagnostics for Evo-era Harleys. Guided trees from the factory manuals, parts ID from a traced atlas, idle RPM from sound, VIN decode, and a Shop tab of garage references and calculators — plug reading, wire and breaker sizes, gear ratios, tap drills, bolt ID, oil grades, compression ratio, carb CFM, sag, parts interchange, and the pre-ride check. Offline-first. No account. The app ranks possibilities and names the confirming test &mdash; it never declares a verdict from a photo or sound alone.</p>
+    <p class="ed-note">Photo, video and sound diagnostics for Evo-era Harleys. Guided trees from the factory manuals, parts ID from a traced atlas, idle RPM from sound, VIN decode, and a Shop tab of garage references and calculators — plug reading, wire and breaker sizes, gear ratios, tap drills, bolt ID, oil grades, compression ratio, carb CFM, sag, parts interchange, tire reading, unit conversion, belt adjustment, clutch adjustment, primary chain adjustment, storage, brake pad replacement, fork oil change, first 500-mile service, engine oil change, transmission oil change, primary oil change, brake fluid bleed &amp; flush, CV carburetor rebuild, and the pre-ride check. Offline-first. No account. The app ranks possibilities and names the confirming test &mdash; it never declares a verdict from a photo or sound alone.</p>
     <label for="bike">Bike</label>
     <select id="bike"></select>
   </header>
@@ -165,8 +169,19 @@
   <section class="ed-panel" id="panel-atlas">
     <div class="ed-card">
       <h3>Atlas — generic layer</h3>
-      <p class="ed-note">Stock reference photos (Creative Commons, credited below) plus your own bikes&rsquo; photos when you add them. Your bike&rsquo;s photos are the ground truth — a stock Fat Boy can&rsquo;t show your bobber.</p>
+      <p class="ed-note">Stock reference photos (Creative Commons, credited below) plus your own bikes&rsquo; photos when you add them. Your 1990 Softail still appears once — as the tappable photo map in the next card, not here. Your bike&rsquo;s photos are the ground truth — a stock Fat Boy can&rsquo;t show your bobber.</p>
       <div class="ed-grid" id="cc-grid"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Your 1990 Softail — tap a part</h3>
+      <p class="ed-note">Joshua&rsquo;s own bike, still from his Nov 24, 2026 video, right side in the garage. Tap an outlined part — you get the same record as the diagrams below (spec, how it fails, price, source). Only the parts you can clearly see in this shot are mapped; the rest stay on the diagrams. Regions are hand-placed, percent-based, so they hold at any screen size.</p>
+      <div class="ed-photo-map">
+        <img class="ed-photo" src="assets/softail-1990-joshua.jpg" alt="Joshua's 1990 Softail in the garage, right side" loading="lazy">
+        <button type="button" class="ed-part ed-photo-spot" data-part="heads" style="left:52%;top:38%;width:13%;height:16%" aria-label="Cylinder heads" title="Cylinder heads"></button>
+        <button type="button" class="ed-part ed-photo-spot" data-part="crankcase" style="left:40%;top:56%;width:10%;height:14%" aria-label="Crankcase" title="Crankcase"></button>
+        <button type="button" class="ed-part ed-photo-spot" data-part="fork" style="left:71%;top:36%;width:12%;height:20%" aria-label="Front fork" title="Front fork"></button>
+        <button type="button" class="ed-part ed-photo-spot" data-part="rear-axle" style="left:12%;top:50%;width:9%;height:12%" aria-label="Rear axle" title="Rear axle"></button>
+      </div>
     </div>
     <div class="ed-card">
       <h3>Tap a part</h3>
@@ -336,7 +351,7 @@
     </div>
     <div class="ed-card">
       <h3>Quick-listen</h3>
-      <p class="ed-note">One tap, 10 seconds: instant RPM + stability + the top 3 likely sounds, each with its confirming test. Sounds are hints, never a verdict.</p>
+      <p class="ed-note">One tap, 10 seconds: instant RPM + stability + the top 3 likely sounds, each with its confirming test. Sounds are hints, never a verdict. If the bike has a healthy baseline, the listen also compares the sound itself — band by band, baseline vs now. Spectrum comparison is not yet validated against real recordings.</p>
       <button class="ed-btn" id="quick-start">Quick-listen (10 s)</button>
       <p id="quick-status" class="ed-note"></p>
       <div id="quick-results"></div>
@@ -362,7 +377,7 @@
     </div>
     <div class="ed-card">
       <h3>Healthy baselines</h3>
-      <p class="ed-note">Record each bike while it is running right. Future recordings are compared against ITS OWN sound, not a generic library.</p>
+      <p class="ed-note">Record each bike while it is running right. Future recordings are compared against ITS OWN sound, not a generic library. Saving a baseline also stores its sound spectrum (8 frequency bands), so a quick-listen can show where the sound changed. Spectrum comparison is not yet validated against real recordings.</p>
       <button class="ed-btn" id="baseline-save">Save this idle as the baseline</button>
       <div id="baseline-list"></div>
     </div>
@@ -380,6 +395,14 @@
       <input type="text" id="vin-input" placeholder="1HD1BJL41VY010000" maxlength="17" class="ed-mono">
       <button class="ed-btn" id="vin-decode">Decode</button>
       <div id="vin-result"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Knucklehead engine (serial) number — 1940&ndash;47</h3>
+      <p class="ed-note">A different system from the 17-digit VIN above — pre-1970 bikes have an engine serial, not a VIN. Format: 2-digit year (40&ndash;47) + model code + serial number. The manual says: &ldquo;Always identify by Engine (Serial) Number.&rdquo; Evo-era year codes do <b>not</b> apply here. Model codes are from the General Specifications table on the same page; a code not in that table is flagged unknown, never guessed. Source: Knucklehead 1940&ndash;1947 Service Manual, p. 3.</p>
+      <label for="knuck-input">Engine (serial) number</label>
+      <input type="text" id="knuck-input" placeholder="e.g. 47FL6216" maxlength="12" class="ed-mono">
+      <button class="ed-btn" id="knuck-decode">Decode</button>
+      <div id="knuck-result"></div>
     </div>
   </section>
 
@@ -439,6 +462,11 @@
       <p class="ed-note">Sportster 1986–2003 only, per leg. Every value is Clymer — never factory. Wet = after a drain; dry = after a full disassembly.</p>
       <div id="sportster-fork-oil"></div>
     </div>
+    <div class="ed-card">
+      <h3>Knucklehead tire pressures — 1940&ndash;47 Service Manual p. 3</h3>
+      <p class="ed-note">Knucklehead 1940&ndash;1947 only, cold pressures in lbs. (psi) as printed on manual p. 3. The second tire size is 5.00&Prime; x 16&Prime; — not 5.00 x 18. No Knucklehead torque values exist in this manual (the manual's language is &ldquo;tighten securely&rdquo;), so none appear here.</p>
+      <div id="knucklehead-tires"></div>
+    </div>
   </section>
 
   <section class="ed-panel" id="panel-shop">
@@ -497,6 +525,76 @@
       <p class="ed-note">The checks are Clymer Ch. 3 (Evo) and Sportster Ch. 3, grouped under the MSF T-CLOCS headings. Tick them off before every ride — the list is the same every time, that is the point.</p>
       <div id="pre-ride"></div>
     </div>
+    <div class="ed-card">
+      <h3>Tire reader — read the sidewall</h3>
+      <p class="ed-note">Type the size and service description off the sidewall (e.g. 130/90-16 M/C 67H) and the DOT date code if you have it. Size, load index and speed rating decode from the Nov 21, 2026 tire-standards research; the age verdict is the Michelin + Dunlop 5-year-inspect / 10-year-replace rule.</p>
+      <div id="tire-reader"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Unit converter — shop units, both ways</h3>
+      <p class="ed-note">Length, torque, pressure and volume. These are standard unit definitions, not manual specs — the factors are exact by definition, so nothing here is a guess.</p>
+      <div id="unit-converter"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Drive belt — check &amp; adjust</h3>
+      <p class="ed-note">FSM #99482-98 §1, pp. 1-43&ndash;1-44. Top strand deflects 3/8&ndash;1/2 in at 10 lbs with belt tension gauge HD-35381. Bike cold, your weight on it, tightest point in the belt.</p>
+      <div id="belt-adjust"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Clutch adjustment — pushrod &amp; cable</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-40. Predelivery, 500 miles, then every 5,000 miles. Do it with the bike at room temperature — a hot adjustment can leave the pushrod too tight when cold and slip the clutch.</p>
+      <div id="clutch-adjust"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Primary chain — check &amp; adjust</h3>
+      <p class="ed-note">FSM #99482-98 §1, pp. 1-38&ndash;1-39. Free play 5/8&ndash;7/8 in cold, 3/8&ndash;5/8 in hot, at the tightest spot in the chain. Disconnect the battery (negative first) before you start.</p>
+      <div id="primary-chain"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Storage — put it away &amp; bring it back</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-8. Both directions: the put-away prep (stabilizer or drained tank, oil in the cylinders, battery out) and the removal-from-storage checks before you start it again. The manual says this work is for a dealer or qualified technician.</p>
+      <div id="storage"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Brake pad replacement — front &amp; rear calipers</h3>
+      <p class="ed-note">FSM #99482-98 §2, pp. 2-40&ndash;2-43 (front) and 2-47&ndash;2-48 (rear). Pads worn to 1/16 in (1.6 mm) or less of friction material = replace the entire set (4). Front and rear pads replaced in sets at the same time. Pump the brake lever until the piston reaches full travel.</p>
+      <div id="brake-pads"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Fork oil change — hydraulic forks</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-42. Every 10,000 miles or prior to storage. HYDRAULIC FORK OIL TYPE &ldquo;E&rdquo; only — FXSTC wet 10.2 oz (302 ml), other models except Springers wet 11.5 oz (340 ml). Fork tube caps 40&ndash;60 ft-lbs.</p>
+      <div id="fork-oil"></div>
+    </div>
+    <div class="ed-card">
+      <h3>First 500-mile service — break-in</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-1 and the Scheduled Service Table, pp. 1-34&ndash;1-37. The dealer performs the 500-mile service — the FSM points at the Owner&rsquo;s Manual list, which is the table itself. All 27 items in the 500-mile column, exactly as printed.</p>
+      <div id="first-500"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Engine oil change — tank, filter &amp; grades</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-38. 3 quarts (2.8 liters) in the tank, filter hand-tight 1/2&ndash;3/4 turn after gasket contact. Oil grade by the lowest temperature expected before the next change. 500 miles, then every 5,000 miles — and annually / prior to storage.</p>
+      <div id="engine-oil"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Transmission oil change</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-41. 24 oz (709.8 ml) of Harley-Davidson Transmission Lubricant, dipstick dipped — not screwed — into the fill hole. 500 miles, then every 5,000 miles — and annually / prior to storage. The manual prints two part numbers for this lubricant; the card carries the conflict.</p>
+      <div id="transmission-oil"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Primary chaincase oil change</h3>
+      <p class="ed-note">FSM #99482-98 §1, pp. 1-39&ndash;1-40. Level at the bottom edge of the diaphragm spring — 1997 models about 32 oz, 1998 models about 26 oz. 500 miles, then every 5,000 miles. Do not over-fill: it drags the clutch and hides neutral.</p>
+      <div id="primary-oil"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Brake fluid — bleed &amp; flush</h3>
+      <p class="ed-note">FSM #99482-98 §2, p. 2-49 (bleed procedure) and §1, p. 1-42 (reservoir). DOT 5 silicone ONLY — never DOT 3 or 4. The manual schedules brake fluid as inspect-only, never replace; this card says so and gives the manual&rsquo;s own bleed method for renewing the fluid. Test the brakes at slow speed on dry pavement after any brake work.</p>
+      <div id="brake-fluid-flush"></div>
+    </div>
+    <div class="ed-card">
+      <h3>CV carburetor rebuild — remove, strip, inspect, reassemble</h3>
+      <p class="ed-note">FSM #99482-98 §4, pp. 4-14&ndash;4-18: removal, installation (manifold capscrews 15&ndash;17 ft-lbs), disassembly of the vacuum piston chamber and carburetor body, cleaning and inspection, float replacement, and assembly. The task asked for removal / installation / disassembly only — assembly and cleaning are wired too, from the same pages, because a rebuild card that only takes the carb apart and never puts it back together is a trap. Part numbers in parentheses are Figure 4-12 callouts.</p>
+      <div id="carb-rebuild"></div>
+    </div>
   </section>
 
   <section class="ed-panel" id="panel-data">
@@ -517,13 +615,14 @@
     </div>
     <div class="ed-card">
       <h3>Sources &amp; credits</h3>
-      <p class="ed-note">Specs and procedures: FSM #99482-98 (1997&ndash;98 Softail Service Manual), 1984&ndash;1999 Softail Repair Manual, S&amp;S instruction 51-1012, Easyriders ER_153 / ER_166, factory bulletin P-20 (Nov 18, 1991). Shop tab: plug conditions (Repair Manual Ch. 3, p. 112), tap drill (Repair Manual Table 7, p. 32; Clymer Table 11, pp. 33&ndash;34), gear ratios (FSM §6 p. 6-1; Clymer five-speed specs), oil grades (FSM §1 p. 1-9), compression ratios (Repair Manual Ch. 5 p. 179; Sportster p. 193), wire gauges and breaker ratings (FSM §8 p. 8-1; App. A Table 2), pre-ride checks (Clymer Ch. 3, p. 74; Sportster Ch. 3, pp. 113&ndash;114), shock preload (FSM §2 p. 2-73). Recalls, bulletins and complaint counts: NHTSA (U.S. federal public domain). Photos: Wikimedia Commons, credited on each photo. Diagrams are hand-traced simplifications, never factory art. Torque and spec values are published facts, each labeled with its source; unverified items stay flagged.</p>
+      <p class="ed-note">Specs and procedures: FSM #99482-98 (1997&ndash;98 Softail Service Manual), 1984&ndash;1999 Softail Repair Manual, S&amp;S instruction 51-1012, Easyriders ER_153 / ER_166, factory bulletin P-20 (Nov 18, 1991). Knucklehead serial decode and tire pressures: Knucklehead 1940&ndash;1947 Service Manual, p. 3. Shop tab: plug conditions (Repair Manual Ch. 3, p. 112), tap drill (Repair Manual Table 7, p. 32; Clymer Table 11, pp. 33&ndash;34), gear ratios (FSM §6 p. 6-1; Clymer five-speed specs), oil grades (FSM §1 p. 1-9), compression ratios (Repair Manual Ch. 5 p. 179; Sportster p. 193), wire gauges and breaker ratings (FSM §8 p. 8-1; App. A Table 2), pre-ride checks (Clymer Ch. 3, p. 74; Sportster Ch. 3, pp. 113&ndash;114), shock preload (FSM §2 p. 2-73), drive belt (FSM §1 pp. 1-43&ndash;1-44), clutch adjustment (FSM §1 p. 1-40), primary chain (FSM §1 pp. 1-38&ndash;1-39), storage (FSM §1 p. 1-8), brake pads (FSM §2 pp. 2-40&ndash;2-43, 2-47&ndash;2-48), fork oil (FSM §1 p. 1-42; fluid §1 p. 1-9; capacities §1 p. 1-36), first 500-mile service (FSM §1 p. 1-1; Scheduled Service Table pp. 1-34&ndash;1-37), engine oil (FSM §1 p. 1-38), transmission lubricant (FSM §1 p. 1-41), primary chaincase lubricant (FSM §1 pp. 1-39&ndash;1-40), brake fluid bleed (FSM §2 p. 2-49; reservoir §1 p. 1-42), CV carburetor rebuild (FSM §4 pp. 4-14–4-18). Recalls, bulletins and complaint counts: NHTSA (U.S. federal public domain). Photos: Wikimedia Commons, credited on each photo. Diagrams are hand-traced simplifications, never factory art. Torque and spec values are published facts, each labeled with its source; unverified items stay flagged.</p>
     </div>
   </section>
 </div>
 <script src="data.js"></script>
 <script src="vin.js"></script>
 <script src="scoring.js"></script>
+<script src="gating.js"></script>
 <script src="audio.js"></script>
 <script src="tire.js"></script>
 <script src="shop.js"></script>

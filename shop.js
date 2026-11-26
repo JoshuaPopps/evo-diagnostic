@@ -93,10 +93,86 @@ const ED_Shop = (() => {
     return Math.round((unloadedIn - loadedIn) * 100) / 100;
   }
 
+  /* --- unit converter: standard unit definitions, not manual specs.
+     Each category table maps unit codes to their factor in the base
+     unit (mm, N·m, kPa, mL). convert() is pure factor arithmetic. --- */
+  function unitConvert(value, fromCode, toCode, units) {
+    if (value === undefined || value === null || isNaN(value)) return null;
+    const from = (units || []).find((u) => u.code === fromCode);
+    const to = (units || []).find((u) => u.code === toCode);
+    if (!from || !to) return null;
+    return value * from.to_base / to.to_base;
+  }
+
+  /* --- tire sidewall decode: metric (130/90-16), alpha (MT90-16) and
+     inch (5.00-16) systems, plus load index and speed rating from the
+     service description (67H). Tables live in ED_DATA.shop.tire_reader;
+     DOT date decode stays in ED_Tire (tire.js). --- */
+  function tireSizeDecode(input, alphaTable) {
+    const s = String(input || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!s) return { error: "Type in the size off the sidewall — e.g. 130/90-16, MT90-16 or 5.00-16." };
+    /* Metric: 130/90-16, 130/90B16, 130/90R16, 180/55ZR17. */
+    let m = s.match(/^(\d{2,3})\/(\d{2})(Z?)([BR-])(\d{2})/);
+    if (m) {
+      const construction = m[4] === "R" ? "radial" : m[4] === "B" ? "bias-belted" : "bias";
+      return {
+        system: "metric", width_mm: parseInt(m[1], 10), aspect: parseInt(m[2], 10),
+        construction, rim_in: parseInt(m[5], 10), size_text: m[1] + "/" + m[2] + m[4] + m[5],
+        speed_prefix: m[3] === "Z" ? "Z" : null
+      };
+    }
+    /* Alpha: MT90-16, MT90B16, MT90R16. */
+    m = s.match(/^M([A-Z])(\d{2})([BR-])(\d{2})/);
+    if (m) {
+      const row = (alphaTable || []).find((r) => r.alpha === "M" + m[1] + m[2]);
+      const construction = m[3] === "R" ? "radial" : m[3] === "B" ? "bias-belted" : "bias";
+      return {
+        system: "alpha", alpha: "M" + m[1] + m[2], aspect: parseInt(m[2], 10),
+        construction, rim_in: parseInt(m[4], 10),
+        size_text: "M" + m[1] + m[2] + m[3] + m[4],
+        metric_equiv: row ? row.metric : null, metric_note: row ? row.note : null
+      };
+    }
+    /* Inch: 5.00-16, 4.00-19. */
+    m = s.match(/^(\d\.\d{2})-(\d{2})/);
+    if (m) {
+      return {
+        system: "inch", width_in: parseFloat(m[1]), width_mm: Math.round(parseFloat(m[1]) * 25.4),
+        aspect: null, construction: "bias", rim_in: parseInt(m[2], 10), size_text: m[1] + "-" + m[2]
+      };
+    }
+    return { error: "Could not read '" + input + "' as a tire size. Metric (130/90-16), alpha (MT90-16) or inch (5.00-16)." };
+  }
+  /* Service description after the size: two digits load index + one
+     letter speed rating, e.g. 67H. M/C (motorcycle) is skipped. */
+  function tireServiceDecode(input, loadTable, speedTable) {
+    const s = String(input || "").trim().toUpperCase().replace(/\s+/g, "");
+    const m = s.match(/M\/C?(\d{2})([A-Z])|(\d{2})([A-Z])\s*$/);
+    if (!m) return { load_index: null, speed: null };
+    const li = parseInt(m[1] || m[3], 10);
+    const sym = m[2] || m[4];
+    const loadRow = (loadTable || []).find((r) => r.li === li);
+    const speedRow = (speedTable || []).find((r) => r.symbol === sym);
+    return {
+      load_index: li,
+      load: loadRow ? { kg: loadRow.kg, lb: Math.round(loadRow.kg * 2.2046) } : null,
+      speed: speedRow ? { symbol: sym, kmh: speedRow.kmh, mph: speedRow.mph } : null
+    };
+  }
+  function loadIndexKg(li, loadTable) {
+    const row = (loadTable || []).find((r) => r.li === li);
+    return row ? { kg: row.kg, lb: Math.round(row.kg * 2.2046) } : null;
+  }
+  function speedRating(sym, speedTable) {
+    const row = (speedTable || []).find((r) => r.symbol === sym);
+    return row ? { symbol: row.symbol, kmh: row.kmh, mph: row.mph } : null;
+  }
+
   const api = {
     primaryRatio, finalRatio, overallRatio, rpmAtSpeed, speedAtRpm,
     tireDiameterIn, sweptCcPerCyl, compressionRatio, chamberCcFromRatio,
-    carbCfm, tapDrillInch, tapDrillMetric, boltIdSae, boltIdMetric, sagDrop
+    carbCfm, tapDrillInch, tapDrillMetric, boltIdSae, boltIdMetric, sagDrop,
+    unitConvert, tireSizeDecode, tireServiceDecode, loadIndexKg, speedRating
   };
   if (typeof module !== "undefined") module.exports = api;
   return api;

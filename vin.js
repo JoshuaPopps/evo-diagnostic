@@ -19,6 +19,49 @@ const ED_VIN = (() => {
      Evo-era value; the decode result flags the ambiguity. */
   const YEAR_CODES = { M: 1991, N: 1992, P: 1993, R: 1994, S: 1995, T: 1996, V: 1997, W: 1998, X: 1999, Y: 2000, "1": 2001, "2": 2002, "3": 2003, "4": 2004, "5": 2005, "6": 2006, "7": 2007, "8": 2008, "9": 2009, A: 2010, B: 2011, C: 2012, D: 2013, E: 2014, F: 2015, G: 2016, H: 2017, J: 2018, K: 2019, L: 2020 };
   const YEAR_CYCLE_AMBIGUOUS = { M: 2021, N: 2022, P: 2023, R: 2024, S: 2025, T: 2026 };
+  /* Knucklehead 1940-47 engine (serial) number — a DIFFERENT system from
+     the 17-digit VIN above. Knucklehead 1940-1947 Service Manual p. 3:
+     "Always identify by Engine (Serial) Number. Example: 46 EL 2222 /
+     Year Model Serial Number." Model codes and engine descriptions are
+     from the General Specifications table on the same page (read visually
+     Nov 25, 2026). Evo-era year codes (position-10 letters) NEVER apply
+     here — the year is the leading two digits, 40-47. Unknown model
+     codes are flagged unknown, never guessed. No Knucklehead torque
+     values exist in this manual ("foot pounds" returns nothing; the
+     manual's language is "tighten securely") — none are wired anywhere. */
+  const KNUCKLEHEAD_SOURCE = "Knucklehead 1940–1947 Service Manual, p. 3";
+  const KNUCKLEHEAD_MODELS = {
+    E: "61 Cu. In. O.H.V. Twin — low compression, 6.5 to 1",
+    EL: "61 Cu. In. O.H.V. Twin — high compression, 7.0 to 1",
+    F: "74 Cu. In. O.H.V. Twin — low compression, 6.6 to 1",
+    FL: "74 Cu. In. O.H.V. Twin — high compression, 7.0 to 1",
+    U: "74 Cu. In. Side Valve Twin — low compression, 5.0 to 1",
+    UL: "74 Cu. In. Side Valve Twin — high compression, 5.5 to 1",
+    UH: "80 Cu. In. Side Valve Twin — low compression, 5.2 to 1",
+    ULH: "80 Cu. In. Side Valve Twin — high compression, 5.7 to 1"
+  };
+  function decodeKnucklehead(raw) {
+    const s = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (s.length === 17) return { error: "That is 17 characters — a 17-digit VIN, not a Knucklehead engine serial. Use the VIN decoder above; Evo-era year codes do not apply to a Knucklehead serial." };
+    const m = s.match(/^(\d{2})([A-Z]+)(\d+)$/);
+    if (!m) return { error: "A Knucklehead engine (serial) number is year + model + serial — e.g. 47FL6216 (1947, FL, serial 6216). The manual's example is 46 EL 2222." };
+    const year = 1900 + parseInt(m[1], 10);
+    if (year < 1940 || year > 1947) return { error: "Year " + m[1] + " reads as " + year + " — the Knucklehead serial system on manual p. 3 covers 1940–1947 only." };
+    const modelCode = m[2];
+    const model = KNUCKLEHEAD_MODELS[modelCode] || null;
+    return {
+      serial: s,
+      year,
+      yearDigits: m[1],
+      modelCode,
+      model,
+      unknownModel: model === null,
+      serialNumber: m[3],
+      source: KNUCKLEHEAD_SOURCE,
+      note: "Knucklehead 1940–1947 Service Manual, p. 3: \"Always identify by Engine (Serial) Number.\" The year is the leading two digits — Evo-era year codes (position-10 letters) do not apply to this system." +
+        (model === null ? " Model code " + modelCode + " is NOT in the manual's p. 3 table — unknown, never guessed." : "")
+    };
+  }
   function checkDigit(vin) {
     let sum = 0;
     for (let i = 0; i < 17; i++) {
@@ -54,7 +97,7 @@ const ED_VIN = (() => {
       note: "Model codes are FSM-verified for 1997-98 Softails and 1986-2003 Sportsters; other years/models decode by structure. Year codes repeat every 30 years (M = 1991 or 2021). A Harley VIN does not encode color or options. Pre-1981 bikes have short serials, not 17-digit VINs."
     };
   }
-  const api = { checkDigit, decode, MODEL_CODES, YEAR_CODES };
+  const api = { checkDigit, decode, decodeKnucklehead, MODEL_CODES, YEAR_CODES, KNUCKLEHEAD_MODELS, KNUCKLEHEAD_SOURCE };
   if (typeof module !== "undefined") module.exports = api;
   return api;
 })();
