@@ -86,7 +86,16 @@ const ED_Scoring = (() => {
     grinding: "grinding", "solenoid-stick": "sticking solenoid",
     /* Round 3 (Nov 25, 2026): trouble-manual gap-fills. Same rule: each
        word must occur in exactly one cause name within its tree. */
-    seized: "seized", "poor-condition": "engine condition"
+    seized: "seized", "poor-condition": "engine condition",
+    /* Round 4 (Nov 25, 2026): check-engine-light tree (Figs. 62-64).
+       Same rule. "no-start-branch" is bumped by the step-3 yes (the
+       simultaneity question) as well as documented on the step-2 no,
+       like "solenoid-stick" in the starter tree; "lamp-led" the same
+       way (step-6 yes, step-5 no). A no never bumps — the no-routing
+       is flowchart documentation only, as in the speedometer tree. */
+    "stuck-on": "stuck on", "no-start-branch": "won't start",
+    "module-dead": "module failed", "wire-upstream": "shorted to voltage",
+    "wire-lamp-feed": "feeding the lamp", "lamp-led": "led itself"
   };
   function applyAnswer(weights, causes, yesValue, answeredYes) {
     if (!answeredYes || !yesValue || yesValue === "next") return weights;

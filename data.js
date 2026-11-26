@@ -897,6 +897,58 @@ const ED_DATA = {
         { cause: "Start button switch or starter relay sticking / internally damaged", weight: 20, test: "Test the start switch (Chapter Twelve, Switches) and the starter relay (this chapter)", fix: "Replace the failed switch or relay", urgency: "high", ride: "Do not ride — disconnect the battery until fixed." },
         { cause: "Grinding — wrong pinion/ring-gear engagement or broken overrunning clutch", weight: 25, test: "Loud grinding when the starter turns; remove and inspect the starter (Chapter Twelve); check pinion-to-ring-gear engagement (B, Figure 8) and the overrunning clutch (Figure 12)", fix: "Correct the engagement; replace the broken overrunning clutch mechanism", urgency: "high", ride: "Do not ride until it cranks cleanly — grinding chews up the ring gear.", part: "starter" }
       ]
+    },
+    {
+      /* Round 4 (Nov 25, 2026): check-engine-light tree, from the
+         Sportster 1986-2003 Troubleshooting Manual, Figs. 62-64
+         (PDF pp. 31-35). Held back from the go-crazy batch and wired
+         now, honestly as the thin tree it is: the no-lamp path needs
+         the Fig. 44 breakout harnesses and every replacement outcome
+         ends in "confirm at a dealership — further testing needs a
+         Scanalyzer". SCOPE, VERIFIED from the manual: the check
+         engine light is part of the 1200S on-board diagnostic system
+         only — "The 1200S models have an on-board diagnostic system"
+         (manual PDF p. 26), and the factory 1998 XLH Service Manual
+         puts trouble-code checking under "1200S Sport" (pp. 7-14 to
+         7-17). Pre-1998 and non-1200S Sportsters have no check engine
+         light at all. Within the app's 1986-99 era the tree covers
+         1998-1999 XL1200S only: Fig. 62 is 1998 models, Fig. 63 is
+         1999-2003 models (the 2000-2003 portion is out of era and is
+         NOT wired), Fig. 64 splits 1998 / 1999-2003 the same way.
+         1998: the lamp is in the tachometer (lamp not replaceable);
+         1999: it is an LED in the speedometer. The tree is NOT added
+         to gating.js: the scope is a hard 1200S-only gate, not a year
+         split of a shared procedure, and the roster carries no 1200S
+         — the title and the step notes state the scope instead. It is
+         NOT added to the wizard areas either: the go-crazy trees were
+         not, and this one is a dealer-ended tree with no
+         critical-urgency cause, so it sorts last under roadside
+         urgency on its own. MANUAL MISPRINT, FLAGGED: Fig. 63 prints
+         the Fig. 65 / Fig. 66 cross-references swapped relative to
+         Fig. 62. The tree follows the chart titles — Fig. 65 is "NO
+         SPARK, NO CHECK ENGINE LIGHT WITH KEY ON" (the module-power
+         chart, PDF p. 36), Fig. 66 is "ENGINE CRANKS BUT WILL NOT
+         START" (PDF p. 37). */
+      id: "check-engine-light",
+      system: "Ignition / electrical",
+      title: "Check engine light dead or stuck on — 1998–1999 XL1200S only",
+      steps: [
+        { q: "With the key on, does the check engine light stay on continuously — never going off after the normal 4-second lamp-on period?", yes: "stuck-on", no: "next", note: "Stuck-on is a different fault path (Fig. 64) from a lamp that never lights (Figs. 62-63). The 4-second on-then-off at key-on is normal — the lamp only counts as stuck if it never goes off. This tree covers 1998-1999 XL1200S only: the check engine light is part of the 1200S on-board diagnostic system, and pre-1998 / non-1200S Sportsters have no lamp to diagnose.", cite: "Sportster 1986-2003 Troubleshooting Manual, Fig. 64 (PDF p. 35)" },
+        { q: "Key on, engine stop switch to RUN. Does the engine start?", yes: "next", no: "no-start-branch", note: "A dead lamp plus a no-start is one fault or two — the next step splits them by whether they arrived together.", cite: "Sportster 1986-2003 Troubleshooting Manual, Fig. 62 (PDF p. 31); Fig. 63 (PDF p. 33)" },
+        { q: "Did the dead lamp and the no-start arrive at the same time — both appearing together? (If the engine starts, answer No.)", yes: "no-start-branch", no: "next", note: "Together = no ignition module power (Fig. 65). Separately = the no-start is its own fault: fix it first (Fig. 66), then return to this chart. Fig. 63 prints the Fig. 65 / Fig. 66 numbers swapped relative to Fig. 62; the tree follows the chart titles — Fig. 65 is the no-spark / no-lamp module-power chart, Fig. 66 is cranks-but-won't-start.", cite: "Sportster 1986-2003 Troubleshooting Manual, Fig. 62 (PDF p. 31); Fig. 63 (PDF p. 33)" },
+        { q: "Ignition off. Connect both Fig. 44 test harnesses between the ignition module and the module connectors [10]. Jumper Pin 4 on the black test harness (B) to ground. Key on: is the check engine light on?", yes: "module-dead", no: "next", note: "The Fig. 44 harnesses are the breakout-box substitute (manual PDF pp. 20/25) — without them there is no test point for the lamp circuit. 1999 models: the chart repeats this jumper — see the cause test before condemning the module.", cite: "Sportster 1986-2003 Troubleshooting Manual, Fig. 62 (PDF p. 31); Fig. 63 (PDF p. 33)" },
+        { q: "1998: disconnect the 14-pin meter-harness connector [20], remove the black/yellow wire from connector [20B] and ground it, then reconnect [20B] — is the check engine light on? 1999: disconnect the 12-pin meter harness connector [20] and check continuity on the black/yellow wire between the speedometer connector [39] and connector [20B] — is it continuous?", yes: "wire-upstream", no: "next", note: "Both years test the same wire from opposite ends. 1998 grounds the black/yellow at [20B] to prove the lamp and its feed; 1999 checks the black/yellow continuous between [39] and [20B] to find which side of the break the open is on.", cite: "Sportster 1986-2003 Troubleshooting Manual, Fig. 62 (PDF p. 31); Fig. 63 (PDF p. 33)" },
+        { q: "Is there an open in the wire feeding the lamp — 1998: the orange/white wire to the bulb, or the wire from the bulb to connector [20B]; 1999: the black/yellow wire between harness connector [20B] and speedometer connector [39]?", yes: "wire-lamp-feed", no: "lamp-led", note: "No open in the feed and the lamp still dark means the lamp itself is dead. 1998: the lamp is in the tachometer and is not replaceable. 1999: it is an LED in the speedometer.", cite: "Sportster 1986-2003 Troubleshooting Manual, Fig. 62 (PDF p. 31); Fig. 63 (PDF p. 33)" },
+        { q: "The feed wire checks good and the lamp still stays dark with the key on. Is the lamp itself the fault — 1998: the tachometer lamp (not replaceable); 1999: the speedometer LED?", yes: "lamp-led", no: "next", note: "This is the manual's last fork: no open in the feed leaves only the lamp. Confirm a tachometer or speedometer replacement at a dealership — further testing needs a Scanalyzer.", cite: "Sportster 1986-2003 Troubleshooting Manual, Fig. 62 (PDF p. 31); Fig. 63 (PDF p. 33)" }
+      ],
+      causes: [
+        { cause: "Check engine light stuck on — short to ground, module, or speedometer (Fig. 64)", weight: 20, test: "First verify it is really stuck: key on, the lamp must go off after the 4-second lamp-on period — if it goes off, the lamp is working properly, so check for stored trouble codes (see Flash Codes) instead. Ignition off, disconnect the ignition module black connector [10], key on: lamp off = replace the ignition module. Lamp still on — 1998 models: disconnect the 14-pin meter-harness connector [20], remove the black/yellow wire from [20B], reconnect [20B]: lamp on = short to ground on the black/yellow wire between [20B] and the lamp in the speedometer; lamp off = short to ground between [20A] and [10]. 1999 models: disconnect the 12-pin speedometer connector [39], check continuity to ground on the 4-pin black/yellow wire in the ignition module connector [10]: no continuity = replace the speedometer; continuity present = disconnect the 12-pin meter-harness connector [20], remove the black/yellow wire, reconnect: lamp on = short to ground between [20B] and speedometer connector [39B]; lamp off = short to ground between [20A] and [10B]", fix: "Repair the short the test finds, or replace the ignition module / speedometer as the test indicates — confirm a module or speedometer replacement at a dealership first; further testing requires a Scanalyzer", urgency: "medium", ride: "Rideable — but a stuck lamp can no longer warn you of a real fault, so fix soon." },
+        { cause: "Engine won't start too — dead lamp and no-start together, or separately", weight: 15, test: "Did the dead lamp and the no-start arrive at the same time? Together = no ignition module power: Fig. 65 — check the ignition fuse first, then the Fig. 44 harness checks (12 ± 1 V across pins 1-2 of the black test harness, continuity from pin 2 to ground, and pin 1 to pin 4 white/black of the right handlebar connector [22B]). Separately = the no-start is its own fault: work the no-start tree (Fig. 66, engine cranks but will not start) first, then return to this chart to resolve the lamp", fix: "No module power: Fig. 65 procedure. Separate no-start: fix the no-start first, then come back to the lamp chart", urgency: "high", ride: "Do not ride — it won't start." },
+        { cause: "Ignition module failed — lamp lights with the Pin 4 jumper", weight: 25, test: "Both Fig. 44 harnesses in-line, Pin 4 on the black test harness (B) jumpered to ground, key on: the lamp lights. 1998 (Fig. 62): that is the module. 1999 (Fig. 63): repeat the jumper before condemning the module — lamp on again = ignition module; lamp stays off on the repeat = speedometer (see the lamp/LED cause)", fix: "Replace the ignition module — confirm it is defective at a dealership first; further testing requires a Scanalyzer", urgency: "medium", ride: "Rideable — the lamp is the only fault and the engine runs. Fix soon: without the lamp you get no code warnings.", part: "ignition-module" },
+        { cause: "Black/yellow wire open or shorted to voltage between the meter connector and the ignition module", weight: 15, test: "1998: grounding the black/yellow wire from connector [20B] lights the lamp. 1999: the black/yellow wire is continuous between speedometer connector [39] and connector [20B], so the open is upstream", fix: "Repair the open or short to voltage on the black/yellow wire between connector [20A] and connector [10B]", urgency: "medium", ride: "Rideable — the lamp is the only fault and the engine runs. Fix soon." },
+        { cause: "Open in the wire feeding the lamp — 1998 orange/white, 1999 black/yellow to [39]", weight: 10, test: "1998: open in the orange/white wire feeding the bulb, or in the wire from the bulb to connector [20B]. 1999: open in the black/yellow wire between harness connector [20B] and speedometer connector [39]", fix: "Repair the open wire", urgency: "low", ride: "Rideable — the lamp is the only fault and the engine runs. Fix soon." },
+        { cause: "Lamp / LED itself failed — 1998 tachometer, 1999 speedometer", weight: 15, test: "No open in the lamp feed and the lamp still stays dark. 1998: the lamp is in the tachometer and is not replaceable. 1999: the lamp is an LED in the speedometer", fix: "1998: replace the faulty tachometer. 1999: replace the speedometer if the LED has failed. Confirm at a dealership first — further testing requires a Scanalyzer", urgency: "low", ride: "Rideable — the lamp is the only fault and the engine runs. Fix soon: without the lamp you get no code warnings." }
+      ]
     }
   ],
   /* Parts & prices — moved to the shared Pocket Garage parts core
@@ -2111,6 +2163,237 @@ const ED_DATA = {
         "Install diaphragm (39), spring (40), O-ring (44) and housing (41). Secure with three screws (43) and lockwashers (42)."
       ]
     },
+    front_wheel: {
+      ref: "FSM #99482-98 §2, pp. 2-4–2-7 (Front Wheel — Models With Hydraulic Forks; Figs. 2-1–2-5). Read from the FSM text, Nov 25, 2026.",
+      note: "Springer models (FXSTS, FXSTSB, FLSTS) have their own front-wheel procedure in §2 (Front Wheel — Springer Fork) — this card is the hydraulic-fork procedure (FXSTC, FLSTC, FLSTF).",
+      removal: [
+        "Block the motorcycle underneath the frame so the front wheel is raised off the ground.",
+        "See Figure 2-1. Remove the brake caliper(s) and let the caliper(s) hang loose. Use care not to scratch the fender paint.",
+        "Remove the axle nut, lock washer, and washer.",
+        "See Figure 2-2. Loosen the slider cap nuts and pull the axle free. On FLSTC, the hubcap will come off with the wheel."
+      ],
+      lever_note: "Do not operate the front brake lever with the front wheel removed or the caliper piston may be forced out. Reseating the piston requires disassembly of the caliper.",
+      installation: [
+        "Place the wheel into the front fork with the valve stem hole on the right side.",
+        "Coat the axle with Loctite ANTI-SEIZE LUBRICANT. Insert the axle into the wheel from the right side.",
+        "Install the washer, lockwasher, and axle nut. Tighten the slider cap nuts to prevent the axle from turning, then tighten the axle nut to 50 ft-lbs (68 Nm). After the axle nut is tightened, loosen, then retighten, the slider cap nuts to 9-13 ft-lbs (7-15 Nm).",
+        "See Figure 2-5. Mount a magnetic base dial indicator to the brake disc with the dial's contact point on the end of the axle. Turn the wheel through several rotations, then move the wheel side to side to check for end play. If the end play is not 0.002 to 0.006 in. (0.05 to 0.15 mm), remove the wheel and substitute shims as required — thicker shim(s) if the end play must be increased, thinner if it must be reduced.",
+        "Install the brake caliper to the fork sides. Tighten the caliper mounting bolts to 25-30 ft-lbs (34-41 Nm)."
+      ],
+      end_play: "Wheel bearing end play on all models is set at 0.002 to 0.006 in. (0.05 to 0.15 mm) on all models except the FLSTS and at 0.001 to 0.010 in. (0.025 to 0.25 mm) on the FLSTS and must not be altered. The shim pack controls the amount of wheel bearing end play. Shim thicknesses: 43290-82, 0.030-0.033 in.; 43291-82, 0.015-0.017 in.; 43292-82, 0.0075-0.0085 in.; 43293-82, 0.0035-0.0045 in.; 43294-82, 0.0015-0.0025 in.",
+      end_play_warning: "Excessive end play may cause a handling problem, and lack of adequate end play could result in a bearing seizure, both of which could cause an accident resulting in personal injury.",
+      torque_flag: "The manual prints the slider cap nuts as 9-13 ft-lbs (7-15 Nm). 9-13 ft-lbs converts to 12-18 Nm, so the printed Nm range does not match the ft-lb range — follow the ft-lb figure (9-13 ft-lbs). The axle nut figure checks out: 50 ft-lbs is 68 Nm."
+    },
+    rear_wheel: {
+      ref: "FSM #99482-98 §2, pp. 2-15–2-17 (Laced or Disc Rear Wheel; Figs. 2-8, 2-9). Read from the FSM text, Nov 25, 2026.",
+      removal: [
+        "Support the motorcycle so the rear wheel is well off the floor. Remove the rear muffler if necessary.",
+        "It may be necessary to remove the debris deflector from the swing arm.",
+        "See Figure 2-8. Remove the spring clip, axle nut, and washer from the left side of the axle. Tap the axle towards the right side and remove. Belt adjuster collars will fall loose when the axle is removed.",
+        "Move the wheel forward and slip the belt off the sprocket.",
+        "Pull the wheel and belt sprocket from the swing arm.",
+        "If the wheel or sprocket must be replaced, remove the bolts and washers securing the sprocket to the wheel."
+      ],
+      installation: [
+        "Place the wheel forward in the swing arm and place the belt on the sprocket.",
+        "Move the wheel back in the swing arm and make sure the brake disc is centered between the brake pads.",
+        "See Figure 2-9. Coat the axle with Loctite ANTI-SEIZE LUBRICANT and from the right side carefully slide the axle and belt adjuster collar through the right rear fork, rear caliper bracket, spacer (7) and brake disc (8).",
+        "Continue sliding the axle through the wheel, spacer (7) on the left side of the wheel, and sprocket (12).",
+        "Place spacer (15) between sprocket (12) and the inside of the left side of the rear fork.",
+        "Slide the axle through spacer (15), belt adjuster collar and left side of rear fork.",
+        "Install the washer and axle nut on the axle.",
+        "Tighten the axle nut to 60-65 ft-lbs (81-88 Nm) and check to see if the cotter pin or spring clip can be installed. If required, tighten the nut just enough to align the axle hole and nut slots.",
+        "Mount a magnetic base dial indicator to the brake disc with the dial's contact point on the end of the axle in the same fashion as shown in Figure 2-5. Turn the wheel through several rotations, then move the wheel side to side to check for end play. If the end play is not 0.002 to 0.006 in. (0.05 to 0.15 mm), remove the wheel and substitute thicker shim(s), if the end play must be increased, or thinner shim(s), if it must be reduced.",
+        "See Figure 2-8. Install a new cotter pin or spring clip.",
+        "Install the debris deflector on the swing arm, if removed.",
+        "Install the rear muffler, if removed.",
+        "Adjust the belt. See Section 1, Scheduled Maintenance Procedures, Drive Belt."
+      ],
+      end_play: "Wheel bearing end play has been set at 0.002 to 0.006 in. (0.05 to 0.15 mm) and must not be altered. The shim pack, Item 11 in Figure 2-9, controls the amount of wheel bearing end play.",
+      end_play_warning: "Excessive end play may cause a handling problem, and lack of adequate end play could result in a bearing seizure, both of which could cause an accident resulting in personal injury.",
+      belt_note: "The axle-nut figure here (60-65 ft-lbs) matches the belt card: 60 ft-lbs, tighten just enough to align the slots, never over 65. Belt adjustment itself is on the belt card (FSM §1 pp. 1-43–1-44)."
+    },
+    brake_disc: {
+      ref: "FSM #99482-98 §2 — front disc pp. 2-4–2-6 (Figs. 2-3, 2-4); rear disc p. 2-16 (Fig. 2-9). Read from the FSM text, Nov 25, 2026.",
+      note: "The manual has no standalone brake-disc procedure — the disc comes off during wheel disassembly. This card collects the disc steps from the front and rear wheel sections; the wheel cards cover the rest of the job.",
+      replace_criterion: "Replace the brake disc if warped, badly scored, or worn beyond the minimum thickness stamped on the disc. (Front, p. 2-4; rear, p. 2-16: 'Replace the brake disc if it is warped, scored, or worn beyond the minimum thickness stamped on the disc.')",
+      front_removal: "Disc wheel: remove the T-40 Torx screws (2) securing the disc. Laced wheel: remove the screws (5) securing the brake disc. Mark the wheel and disc so they will be assembled in their original positions.",
+      front_assembly: "Be sure the brake disc is clean. Install the brake disc in the original position using new Torx screws. Tighten screws to 16-24 ft-lbs (22-33 Nm). (Disc wheel and laced wheel — the same figure.)",
+      rear_removal: "Remove the brake disc screws (9). Remove brake disc (8).",
+      rear_assembly: "Clean the disc with Loctite Cleaning Solvent and install the disc on the wheel with new T-45 Torx screws (9). Tighten screws to 30-45 ft-lbs (41-61 Nm)."
+    },
+    fork_seal: {
+      ref: "FSM #99482-98 §2, pp. 2-51–2-54 (Hydraulic Front Forks — FXSTC, FLSTC, FLSTF; Figs. 2-58, 2-59). Read from the FSM text, Nov 25, 2026.",
+      warnings: [
+        "The FLSTC and FLSTF models have a preloaded fork spring. Disassemble the fork tube(s) carefully. The spring can force parts from the tube unexpectedly, possibly causing personal injury.",
+        "Fork tube plug (5) is under spring pressure. Remove carefully to prevent personal injury."
+      ],
+      removal: [
+        "Remove the front wheel and brake caliper as described previously in this section.",
+        "Remove the front fender.",
+        "See Figures 2-58 or 2-59. Remove the slider tube cap (1), spacer (2) and oil seal (3) from the top of one fork side.",
+        "Loosen the pinch bolt (4) and pull the fork side from the brackets.",
+        "Repeat Steps 1 through 4 for the other fork side."
+      ],
+      disassembly: [
+        "Support the vehicle so the front end is off the floor and the forks are fully extended.",
+        "See Figures 2-58 or 2-59. Remove the fork tube plug (5) and O-ring (6). Pull spring (7) out of slider tube (8). Remove drain screw (9) and washer (10), and drain the fork.",
+        "Remove dust seal (23) (FXSTC only). Compress retaining ring (11) and remove the clip from the internal groove at the top of slider (12).",
+        "Use an allen wrench and remove socket screw (13) with washer (14) from the bottom end of fork slider (12). This will free damper tube (15) and fork tube (8) so that they can be removed from slider (12). NOTE: since there is little resistance to rotation when removing socket screw (13), the job is done more easily with an air impact wrench.",
+        "The upper bushing (16) is a slight interference fit in slider (12). The upper bushing (16) together with spacer (17) and oil seal (18) are removed by lightly hitting the upper bushing with the lower bushing (19) as the fork tube is pulled free of the fork slider (12) in a quick continuous stroke. Continue this slide hammer action until the components are freed.",
+        "Push the damper tube (15) and damper tube spring (20) free of fork tube (8) by inserting a small diameter rod through the opening in the bottom of the tube.",
+        "Remove lower stop (21) from the lower end of damper tube (15).",
+        "Damper tube rings (22) can now be removed from the grooves at the top end of damper tube (15). Lower bushing (19) should not be removed unless it is to be replaced. When replacing lower bushing (19), expand the new split bushing diameter only enough to fit over slider tube (8) and slide the bushing into the bushing groove."
+      ],
+      inspection: [
+        "Inspect friction rings (22) on damper tube (15) and replace if worn excessively or damaged.",
+        "Check FXSTC dust seal (23) where it rubs on fork tube (8). The tube should show a bright, shining surface, free of scoring or abrasions, and the dust seal should present a good continuous seal and not show excessive wear.",
+        "Replace either of the springs (7 or 20) if broken.",
+        "Be sure O-ring (6) is in good condition, without irregularities, and that it provides proper sealing when in place.",
+        "Check both washers (10 and 14) to see that they provide a good seal when used with their respective screws (9 and 13) to prevent oil leakage.",
+        "Replace a bent or damaged fork tube (8)."
+      ],
+      assembly: [
+        "See Figures 2-58 or 2-59. Install damper tube rings (22). Place damper tube spring (20) on damper tube (15). Insert damper tube into fork tube (8).",
+        "Insert spring (7) into fork tube (8), tapered side toward damper tube, and push the bottom of damper tube (15) through the opening at the bottom end of the fork tube. Place lower stop (21) over the end of damper tube (15).",
+        "Position fork tube (8) and damper tube (15) in slider (12). Hold the assembly in place by exerting pressure on the spring and install socket screw (13) with washer (14).",
+        "Place upper bushing (16), seal spacer (17) and a new seal (18) (in that order) over fork slider (12). Be sure that the flanged surface of the seal spacer (17) is up and the lettered side of the seal is facing upward. Place installation tool HD-34634 over fork slider (12). Seat bushing (16), spacer (17), and seal (18) into the slider bore by lightly tapping the components into place with the installation tool. Install retaining ring (11). On FXSTC only, install dust cover (23).",
+        "Fill fork sides with Harley-Davidson TYPE E FORK OIL in the amount specified under GENERAL. (Fork-oil card: FXSTC wet 10.2 oz (302 ml); other models except Springers wet 11.5 oz (340 ml).)"
+      ],
+      installation: [
+        "See Figures 2-58 or 2-59. Insert both fork side assemblies up through the fork stem and bracket (24) and upper bracket (29).",
+        "Install a new oil seal (3), spacer (2) and fork tube plug (5). Tighten securely. Be sure one flat on each fork tube plug (5) faces toward the inside of the fork.",
+        "Install slider tube cap(s) (1).",
+        "Tighten the fork stem bracket pinch bolt(s) (4) to 23-28 ft-lbs (31-38 Nm)."
+      ],
+      torque_note: "§2 prints no torque for the fork tube plug here — 'tighten securely'. The §1 fork-oil procedure gives fork tube caps 40-60 ft-lbs (54-81 Nm); that figure is on the fork-oil card."
+    },
+    steering_head: {
+      ref: "FSM #99482-98 §2, p. 2-54 (Steering Head Bearing Adjustment — fall-away) and pp. 2-67–2-69 (Steering Head removal, disassembly, assembly; Figs. 2-79–2-83); §1 intervals p. 1-42. Read from the FSM text, Nov 25, 2026.",
+      fallaway_spec: "Fall-away must be 1-2 inches (25-50 mm).",
+      fallaway: [
+        "Support the motorcycle in an upright position so the front end is completely suspended.",
+        "Remove all accessory weight, such as a windshield, that may influence the way the front end swings. If the clutch cable is routed so it pulls the front end one way or the other, disconnect it.",
+        "Place a suitable material, such as masking tape, over the fender tip.",
+        "Install a pointer so the base is stationary on the floor and the pointer indicates the center of the fender. The front end must be straight ahead.",
+        "Loosen the lower triple clamp pinch bolts.",
+        "Tap the fender on one side until the front end begins to 'fall-away' by itself. Mark this point on the marking material. Repeat in the other direction.",
+        "Tighten or loosen the fork adjuster nut/bolt until the 'fall-away' point is within 1 to 2 inches (25 to 50 mm). NOTE: if the 'fall-away' point is more than 2 inches (50 mm), loosen the adjuster nut. If it is less than 1 inch (25 mm), tighten the adjuster nut.",
+        "Tighten the lower triple clamp pinch bolts to a torque of 30 to 35 ft-lbs (41 to 47 Nm).",
+        "Repeat the 'fall-away' procedure to be sure the adjustment is correct."
+      ],
+      removal: [
+        "Remove the fork sides. See HYDRAULIC FRONT FORKS. (Springer models: remove the fork from the steering head as described under FORK REMOVAL.)",
+        "Remove the headlamp and headlamp bracket.",
+        "Remove the brake hose bracket from the bottom of the fork stem and bracket.",
+        "FLSTC, FLSTF: remove the fork stem cap (1). Loosen pinch bolt (10) and remove fork stem bolt (2). Remove washer (3) with the handlebar and upper bracket (4). FXSTC: remove the fork stem cap (1). Bend the lockwasher (3) tab away from the fork stem nut (2) and remove the fork stem nut with the handlebar and upper bracket (4).",
+        "Remove the adjusting nut (5) and pull the fork stem and bracket out of the steering head. Remove the upper dust shield (6).",
+        "Remove bearings (7) using STEERING HEAD BEARING RACE REMOVER Part No. HD-39301A and UNIVERSAL DRIVER HANDLE Part No. HD-33416, if necessary."
+      ],
+      race_note: "If bearing races are removed, the bearings cannot be reused — they must be replaced. See REMOVING LOWER BEARINGS FROM FORK STEM.",
+      lower_bearing: "Chisel the cage that holds the rollers on the bearing. Turn the fork stem upside down and heat the inner race. The race will expand and fall off the fork stem. Once the race is removed, you will be able to remove the lower dust shield. (Springer rigid fork stem brackets have notches machined into the pad — use a pair of pry bars to pry the lower dust shield and bearing off the fork stem. CAUTION: protect the rigid fork legs when prying the neck bearing off the steering stem.)",
+      race_removal: "To remove the bearing race from the frame neck, use STEERING HEAD BEARING RACE REMOVER Part No. HD-39301A and UNIVERSAL DRIVER Part No. HD-33416 (Fig. 2-82): with the tapered side down, seat the two-piece remover tool on the upper bearing race leaving a gap in the middle; install the collet on the driver; insert the driver at the bottom of the steering head tube, and while holding the remover tool on the race, center the collet in the gap; tap the driver to remove the upper race; reverse the tool and repeat the procedure to remove the lower race.",
+      inspection: [
+        "Check upper and lower bearing races in the steering head. If they are pitted or grooved, replace the bearings and races in sets.",
+        "Check the roughness of the bearings by turning them in the race. Replace bearings if they do not turn freely and smoothly.",
+        "CAUTION: always replace both races and bearings even if one race and bearing appear to be good. Mismatched bearing components may lead to excessive wear and the need for premature bearing replacement."
+      ],
+      assembly: [
+        "Lubricate the outside of the bearing races with engine oil.",
+        "Install the new races using STEERING HEAD BEARING RACE INSTALLER Part No. HD-39302.",
+        "Pack the new bearings with Harley-Davidson Special Purpose Grease.",
+        "Install the lower dust shield on the fork stem. Press the lower bearing into place. Use a sleeve that will contact only the inner race of the new bearing. CAUTION: do not use a sleeve that is larger than the inner race of the bearing or the bearing cage may be damaged. A damaged bearing cage will require replacement of both the cage and the bearing.",
+        "Install the fork in the steering head. See either HYDRAULIC FRONT FORKS or SPRINGER FORK in this Section.",
+        "Fill the neck with Harley-Davidson Special Purpose Grease through the grease zerk located in the steering head.",
+        "Adjust fall-away. See Head Bearing Adjustment in the HYDRAULIC FORKS Section or Springer Head Bearing Adjustment in the SPRINGER FORK Section."
+      ],
+      race_warning: "Use care not to damage the new races' tapered surface. The race should be firmly seated against the shoulder in the bore. If it is loose, the steering head adjustment will become loose, adversely affecting the motorcycle's handling, which may lead to an accident resulting in personal injury.",
+      installation_flstc: [
+        "See Figure 2-79. Insert the fork stem and bracket assembly (9) into the frame steering head and install the upper bearing and dust shield (5).",
+        "Install the upper bracket (4), a new washer (3) and fork stem bolt (2). Tighten the fork stem bolt until the bearings have no noticeable shake. The fork stem must turn freely from side to side. Tighten pinch bolt (10) to 21-27 ft-lbs (28-37 Nm). CAUTION: overtightening the stem bolt will cause the bearings to wear excessively, leading to the need for premature bearing replacement.",
+        "Fasten the brake hose bracket to the bottom bracket using original hardware. Tighten the bolt to 11 ft-lbs (15 Nm).",
+        "Install the headlamp assembly. See the ELECTRICAL section.",
+        "Install the fork sides as described previously.",
+        "Adjust bearing tightness using fork stem bolt (2). See ADJUSTMENT.",
+        "Install the fork stem cap (1)."
+      ],
+      stem_warning: "An improperly adjusted fork stem bolt may adversely affect handling, which could lead to an accident resulting in personal injury.",
+      interval: "Springer models (FLSTS, FXSTS, FXSTSB): grease the steering head bearings through the grease fitting on the steering neck with Special Purpose Grease, Part No. 99857-97, at every scheduled service interval, until grease begins to come out of the top and bottom of the steering head. At every 20,000 mile (32000 km) service interval, remove, inspect, and repack the steering head bearings. See Section 2 for bearing removal. (FSM §1 p. 1-42.)"
+    },
+    clutch_cable: {
+      ref: "FSM #99482-98 §2, p. 2-75 (Clutch Hand Control; Figs. 2-87, 2-88). Read from the FSM text, Nov 25, 2026.",
+      replace_when: "The §2 procedure gives no wear limit for the cable itself. The 500-mile check lists 'cables for fraying or crimping and free operation' (FSM §1 p. 1-1) — a frayed, kinked, or binding cable is a replace-it cable. The §2 throttle-control cleaning step says the same for cables generally: 'Replace the cables if frayed, kinked, or bent' (§2 p. 2-74).",
+      removal: [
+        "Loosen the cable adjuster so all tension is out of the clutch cable. See Section 6.",
+        "Remove the transmission clutch release cover. See Section 7.",
+        "CAUTION: the inner ramp and coupling must be removed from the side cover before disconnecting the cable end or the cable will be damaged.",
+        "Disconnect the cable end from the ball and ramp coupling. Unscrew the cable fitting from the side cover.",
+        "Remove the hand lever pivot pin.",
+        "Remove the clutch cable and anchor pin from the hand lever."
+      ],
+      installation: [
+        "See Figure 2-87. Install the clutch cable and anchor pin in the clutch hand lever. The flat in the pin must face in towards the hand lever.",
+        "Put the cable clevis in position in the hand lever and slide the anchor pin into place.",
+        "Install the hand lever assembly and pivot pin.",
+        "See Figure 2-88. Route the clutch cable as follows: A. Route the clutch cable across the front of the handlebars for the following models: FLSTS, FXSTS, FXSTSB, FXSTC. Route the clutch cable behind the handlebars for the following models: FLSTF, FLSTC. B. Route the cable under the gear cover and through the bracket. C. Route the cable to the transmission cover. D. Route the cable down to the clamp on the left frame downtube.",
+        "Insert the cable end into the side cover and connect it to the ball and ramp coupling.",
+        "Screw the cable fitting into the side cover. Tighten the fitting to 3-5 ft-lbs (4-7 Nm).",
+        "Adjust the cable adjuster so there is enough slack to install the side cover. See Section 7.",
+        "Adjust the clutch cable. See Section 1. (The clutch-adjustment card.)"
+      ]
+    },
+    wheel_bearing: {
+      ref: "FSM #99482-98 §1, p. 1-41 (Wheel Bearings); §2 wheel disassembly and assembly pp. 2-4–2-7 (front) and 2-15–2-17 (rear). Read from the FSM text, Nov 25, 2026.",
+      interval: "At every 10,000 mile (16000 km) service interval, or prior to storage, remove, inspect, and repack the wheel bearings.",
+      steps: [
+        "Remove the wheel assembly from the motorcycle then remove the spacers, seals, and wheel bearings. See Section 2.",
+        "WARNING: never 'spin dry' bearings with compressed air. Spinning may cause a bearing to fly apart, causing personal injury.",
+        "Clean the bearings in a non-flammable cleaning solution and inspect the bearings for damage. Check the bearing races, and if the races are damaged, see Section 2 for replacement procedures. Always replace bearings and bearing races as a set.",
+        "Repack the bearings with wheel bearing grease and reassemble the wheel according to the instructions in Section 2."
+      ],
+      race_tool: "Bearing races come out with WHEEL BEARING RACE REMOVER & INSTALLER, Part No. HD-33071, and UNIVERSAL DRIVER HANDLE, Part No. HD-33416. New races are lubricated with oil and pressed into the hub with the same tool and an arbor press.",
+      grease: "Pack the bearing cones with H-0 WHEEL BEARING GREASE, Part No. 99855-89, one in each side of the wheel hub. Pack the space between the bearings and oil seals with the same grease.",
+      seal_depths: [
+        "Front disc wheel: lightly coat the outside lip of each oil seal with engine oil. Press each seal into each side of the wheel until the seal is flush to 0.04 in. (1.0 mm) below the outside edge of the wheel hub.",
+        "Front laced wheel: press each seal until it is flush to 0.02 in. (0.51 mm) below the outside edge of the wheel hub.",
+        "Rear laced wheels: press the oil seals into both ends of the hub with the garter spring facing inward and the seals 0.260-0.280 in. (6.60-7.11 mm) below the outer surface of the wheel hub.",
+        "Rear cast wheels: press the right side (brake disc side) seal flush with the outer surface of the wheel hub. The left (sprocket) side seal must be pressed into the hub to a depth of 0.31 in. (7.9 mm) from the outer surface of the hub."
+      ],
+      spacer_caution: "Be sure the smaller diameter on the spacer washer faces outward toward the bearing. If the spacer washer is reversed, the large diameter could contact the bearing rollers and cage and damage the bearing.",
+      sets_note: "Check the bearing races. If pitted or grooved, replace the races and the bearings, in sets only.",
+      end_play: "Wheel bearing end play is set at 0.002 to 0.006 in. (0.05 to 0.15 mm) and must not be altered — the shim pack controls it. Check end play with a dial indicator after the axle nut is tightened (see the front and rear wheel cards)."
+    },
+    clutch_plates: {
+      ref: "FSM #99482-98 §6, pp. 6-12–6-15 (Clutch — 1998 Models, 9-Plate; Figs. 6-16, 6-17, 6-20). Read from the FSM text, Nov 25, 2026.",
+      note: "1998 models run a new 9-plate clutch (nine friction plates, eight steel plates). The pack alone can be done on the motorcycle — shell and hub stay in the bike. Complete disassembly (bearing work) is a separate, bigger job: if the clutch shell and hub are pressed apart, the bearing must be replaced.",
+      removal: [
+        "Remove the primary chaincase cover. See PRIMARY CHAINCASE COVER, REMOVAL.",
+        "See Figure 6-16. Remove six bolts to release diaphragm spring retainer from clutch hub.",
+        "Remove diaphragm spring retainer, diaphragm spring and pressure plate from clutch hub.",
+        "Remove friction plates, steel plates, damper spring and damper spring seat from clutch hub. See CLEANING AND INSPECTION."
+      ],
+      assembly: [
+        "See Figure 6-16. Install the narrow friction plate on the clutch hub engaging tabs on plate with slots in clutch shell.",
+        "Install damper spring seat on clutch hub so that it seats inboard of narrow friction plate.",
+        "Install damper spring on clutch hub with the concave side up (facing opposite damper spring seat).",
+        "Install a steel plate and then a friction plate on the clutch hub. Install seven remaining sets in the same manner, alternating between steel plates and friction plates.",
+        "Install pressure plate on clutch hub aligning holes in plate with threaded bosses on hub.",
+        "Seat diaphragm spring in recess of pressure plate with the concave side down.",
+        "Align holes in diaphragm spring retainer with threaded bosses on clutch hub. Tabs on spring retainer contact flats on inboard side of bosses.",
+        "Install six bolts to secure diaphragm spring retainer to clutch hub. Alternately tighten bolts to 90-110 in-lbs (10.2-12.4 Nm).",
+        "Install the primary chaincase cover. See PRIMARY CHAINCASE COVER, INSTALLATION."
+      ],
+      inspection: [
+        "Wash all parts in cleaning solvent, except for friction plates and bearing, if removed. Blow dry with compressed air.",
+        "Friction plates: wipe all lubricant from the plates. Measure the thickness of each plate with a dial caliper or micrometer. If the thickness of any plate is less than 0.143 inch (3.62 mm), discard all friction plates and replace with an entirely new set. Look for worn or damaged fiber surface material (both sides).",
+        "Replace all nine friction plates with an entirely new set if any individual plate shows evidence of wear or damage.",
+        "Steel plates: discard any plate that is grooved or bluish in color — blue plates are likely warped or distorted. Check each plate for distortion: lay the plate on a precision flat surface and insert a feeler gauge between the plate and the flat surface in several places. Replace any steel plate that is warped more than 0.006 inch (0.15 mm).",
+        "Bearing: holding the clutch hub, rotate the clutch shell to check bearing for smoothness. Replace the bearing if it runs rough or binds.",
+        "Check the primary chain sprocket and the starter ring gear on the clutch shell — replace the clutch shell if either is badly worn or damaged. Check the slots that mate with the clutch plates on both shell and hub — replace shell or hub if slots are worn or damaged. Check the diaphragm spring and diaphragm spring retainer for cracks or bent tabs — obtain a new spring or retainer if either condition exists.",
+        "Soak all friction and steel plates in PRIMARY CHAINCASE LUBRICANT for at least 5 minutes before installing."
+      ],
+      year_split: "1997 models run the earlier 8-plate clutch (§6 pp. 6-8–6-11): eight friction plates, measured as a stack — the minimum stack thickness must be no less than 0.661 in. (16.79 mm), measured with a dial caliper or micrometer. The spring plate (11) is measured in 4 places around the circumference — replace the plate if any two measurements differ by 0.020 in. (0.51 mm) or more. And the 1997 pack comes out only with the SPRING COMPRESSING TOOL, Part No. HD-38515A: do not attempt to disassemble the 1997 clutch without it, the diaphragm spring is highly compressed and could fly out with great force. The 1998 9-plate clutch on this card needs no compressing tool for pack-only work — six bolts hold the diaphragm spring retainer. The 1998 clutch also raises primary chaincase capacity to 26 oz (768.9 ml); the primary-oil card carries the fill."
+    },
     interchange: {
       ref: "Harley SIP factory parts catalogs + Ronnie's HLSM fiche; factory bulletin P-20 (Nov 18, 1991); FSM #99482-98 §8; Sportster 1986-2003; 1984-1999 Softail Repair Manual pp. 138-139; Easyriders ER_262 §145 and ER_305 §18 (magazine); aftermarket fitment corroboration: Drag Specialties, Cycle Electric, J&P Cycles, V-Twin Mfg, Dennis Kirk, RM Stator, AJ-Elec; FXR Archive VOES page.",
       rows: [
@@ -2128,6 +2411,12 @@ const ED_DATA = {
         { part: "Brake pads with 1992 stainless rotors", fits: "DOES NOT interchange — 1991-and-earlier pads must not be used with 1992 stainless-steel rotors", note: "New rotors need the new pads — old pads cause premature rotor wear.", source: "Factory bulletin P-20 (Nov 18, 1991)" },
         { part: "Wheel bearing 9052 (race 9033) — swingarm", fits: "Big Twin swingarms 1958-84", note: "Same bearing, second application — a wheel-bearing search should surface it.", source: "Dennis Kirk / Drag Specialties" },
         { part: "VOES (vacuum switch)", fits: "DOES NOT interchange across year bands — 26557-83 fits 1984-90 FXR; 26566-91 fits 1991-94; 26566-96 fits 1999 FXR2/3", note: "Different part per year band — buy for your year. Hose 26570-84.", source: "FXR Archive VOES page (factory catalog proof per year-band)" }
+      ]
+    },
+    equivalents: {
+      ref: "Aftermarket-equivalent layer — retailer fitment claims, not factory fitment. The OEM number each row replaces is verified in the factory catalogs and bulletin P-20; the equivalence itself is the retailer's claim, verified against at least two independent sources per row. Verify against the fiche before you buy. Never mixed into the OEM interchange table.",
+      rows: [
+        { part: "EBC FA400 brake pads (EBC application-table no. 15-94) — replaces OEM 44063-83A/C", fits: "Softail all models 1984–99 (HardDrive/EBC table); Softail / Dyna / Electra Glide / Sportster (BrakeCrafters)", note: "Aftermarket equivalent, not factory fitment. P-20 condition applies: 1991-and-earlier pads must not be used with 1992 stainless-steel rotors — new rotors need the new pads.", source: "BrakeCrafters (EBC FA400 cross-reference); HardDrive 2023 catalog p. 732 (EBC application table: Softail '84–99 → 15-94); Drag Specialties (Repl. OEM# 44063-83A/C); factory bulletin P-20 (Nov 18, 1991)" }
       ]
     },
     preride: {

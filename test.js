@@ -1,6 +1,7 @@
 /* The Evo Diagnostic — test suite. Plain check(), run: node test.js */
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 const D = require("./data.js");
 const A = require("./audio.js");
 const H = require("./handoff.js");
@@ -13,6 +14,16 @@ function check(name, cond) {
 function eq(name, a, b) { check(name + " (got " + JSON.stringify(a) + ", want " + JSON.stringify(b) + ")", a === b); }
 
 /* --- data integrity --- */
+/* The suite reads app.js as a string for most checks, so it never
+   parses it — a typo that breaks the whole app would pass every
+   string check. node --check on every app script first (v24: caught
+   a stray backslash-quote on the wiz-results line the string checks
+   could not see). */
+check("every app script parses (node --check)",
+  ["app.js", "data.js", "wizard.js", "shop.js", "gating.js", "handoff.js", "report.js", "scoring.js", "tire.js", "vin.js", "audio.js", "nhtsa.js", "sw.js", "sw-update.js", "pg-parts-core.js"].every((f) => {
+    try { execSync("node --check " + path.join(__dirname, f), { stdio: "ignore" }); return true; }
+    catch (e) { return false; }
+  }));
 eq("roster has 3 bikes", D.roster.length, 3);
 eq("roster keys match carb seed", D.roster.map((b) => b.id).join(","), "b1,b2,b3");
 eq("CV40 main jet", D.carbs.b2.main, "185");
@@ -140,7 +151,7 @@ eq("data.js engine code P", D.vin.engine_codes.P, "1200cc (Sportster)");
 eq("data.js plant code Y", D.vin.plant_codes.Y, "York, PA");
 
 /* --- trees: 14 now (13 + smoking / oil consumption, batch 2) --- */
-eq("trees count is 19", D.trees.length, 19);
+eq("trees count is 20", D.trees.length, 20);
 check("oil-leak tree present", D.trees.some((t) => t.id === "oil-leak"));
 check("clutch tree present", D.trees.some((t) => t.id === "clutch"));
 check("lights tree present", D.trees.some((t) => t.id === "lights"));
@@ -250,7 +261,7 @@ check("most expensive verified price is the transmission kit at $429.00", Core.g
 check("every cause part key exists in the parts core",
   D.trees.every((t) => t.causes.every((c) => !c.part ||
     (Array.isArray(c.part) ? c.part : [c.part]).every((k) => Core.getPrice(k) !== null))));
-eq("75 of 142 causes name a part", D.trees.reduce((n, t) => n + t.causes.filter((c) => c.part).length, 0), 75);
+eq("76 of 150 causes name a part", D.trees.reduce((n, t) => n + t.causes.filter((c) => c.part).length, 0), 76);
 check("every atlas part except the rubber plug and jackshaft has a live price",
   Object.keys(D.parts).every((k) => k === "rubber-plug" || k === "jackshaft" || (Core.getPrice(k) !== null && typeof Core.getPrice(k).price === "number")));
 check("rubber plug points at the rebuild kit instead of a fake price",
@@ -549,8 +560,8 @@ check("manifest wires icon-192", (manifest.icons || []).some((i) => i.sizes === 
 check("manifest wires icon-512", (manifest.icons || []).some((i) => i.sizes === "512x512"));
 check("icon-512.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-512.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
 check("icon-192.png is real PNG bytes", fs.readFileSync(path.join(__dirname, "icon-192.png")).slice(0, 8).toString("hex") === "89504e470d0a1a0a");
-check("sw.js caches v22", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v22"));
-check("sw.js no longer names the v19 cache", !fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v19"));
+check("sw.js caches v25", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v25"));
+check("sw.js no longer names the v22 cache", !fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("evo-diagnostic-v22"));
 check("sw.js precaches tire.js + nhtsa.js + handoff.js + sw-update.js + shop.js + wizard.js + report.js + gating.js", fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("tire.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("nhtsa.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("handoff.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("sw-update.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("shop.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("wizard.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("report.js") && fs.readFileSync(path.join(__dirname, "sw.js"), "utf8").includes("gating.js"));
 check("index.html loads tire.js + nhtsa.js + handoff.js + shop.js + wizard.js + report.js", html.includes('src="tire.js"') && html.includes('src="nhtsa.js"') && html.includes('src="handoff.js"') && html.includes('src="shop.js"') && html.includes('src="wizard.js"') && html.includes('src="report.js"'));
 check("index.html loads wizard.js + report.js before app.js", html.indexOf('src="wizard.js"') < html.indexOf('src="app.js"') && html.indexOf('src="report.js"') < html.indexOf('src="app.js"'));
@@ -620,7 +631,7 @@ check("every new-tree step yes-value is mapped in scoring",
   [richTree, transTree].every((t) => t.steps.every((s) => !s.yes || s.yes === "next" || Object.prototype.hasOwnProperty.call(S.YES_MAP, s.yes))));
 
 /* --- library sweep (Nov 24-25, 2026): Easyriders tips + Sportster/Clymer layer --- */
-eq("144 causes total after round 3 (142 + 2 gap-fills)", D.trees.reduce((n, t) => n + t.causes.length, 0), 144);
+eq("150 causes total after round 4 (144 + 6)", D.trees.reduce((n, t) => n + t.causes.length, 0), 150);
 check("every tree's weights sum to 100",
   D.trees.every((t) => t.causes.reduce((n, c) => n + c.weight, 0) === 100));
 check("every tree step yes-value is mapped in scoring",
@@ -636,20 +647,23 @@ const signalsTree = D.trees.find((t) => t.id === "turn-signals");
 const powerTree = D.trees.find((t) => t.id === "poor-power-acceleration");
 const overheatTree = D.trees.find((t) => t.id === "engine-overheating");
 const starterTree = D.trees.find((t) => t.id === "starter-wont-disengage");
-check("all five trouble-manual trees present", !!speedoTree && !!signalsTree && !!powerTree && !!overheatTree && !!starterTree);
+const celTree = D.trees.find((t) => t.id === "check-engine-light");
+check("all five trouble-manual trees present, plus the round-4 check-engine-light tree", !!speedoTree && !!signalsTree && !!powerTree && !!overheatTree && !!starterTree && !!celTree);
+eq("check-engine-light tree has 6 causes", celTree.causes.length, 6);
+eq("check-engine-light tree has 7 steps", celTree.steps.length, 7);
 eq("speedometer tree has 7 causes", speedoTree.causes.length, 7);
 eq("turn-signals tree has 8 causes", signalsTree.causes.length, 8);
 eq("poor-power tree has 11 causes", powerTree.causes.length, 11);
 eq("overheating tree has 6 causes", overheatTree.causes.length, 6);
 eq("starter-wont-disengage tree has 4 causes", starterTree.causes.length, 4);
-[speedoTree, signalsTree, powerTree, overheatTree, starterTree].forEach((t) => {
+[speedoTree, signalsTree, powerTree, overheatTree, starterTree, celTree].forEach((t) => {
   eq(t.id + " weights sum to 100", t.causes.reduce((n, c) => n + c.weight, 0), 100);
   t.steps.forEach((s, i) => check(t.id + " step " + i + " cites the troubleshooting manual", !!s.cite && s.cite.includes("Sportster 1986-2003 Troubleshooting Manual")));
   t.causes.forEach((c) => check(t.id + " cause has test/fix/urgency/ride: " + c.cause.slice(0, 30), !!c.test && !!c.fix && ["low", "medium", "high", "critical"].includes(c.urgency) && !!c.ride));
 });
 /* Every new-tree yes-key bumps exactly one cause by 15 and nothing else —
    this is what proves each YES_MAP word is unique within its tree. */
-[speedoTree, signalsTree, powerTree, overheatTree, starterTree].forEach((t) => {
+[speedoTree, signalsTree, powerTree, overheatTree, starterTree, celTree].forEach((t) => {
   const base = {};
   t.causes.forEach((c) => { base[c.cause] = c.weight; });
   const keys = [...new Set(t.steps.map((s) => s.yes).filter((k) => k && k !== "next"))];
@@ -692,6 +706,37 @@ check("starter tree: solenoid compression spring, pinion jammed on worn ring gea
   starterTree.causes[0].ride.includes("disconnect the battery"));
 check("starter tree: grinding is the broken overrunning clutch or wrong engagement",
   starterTree.causes.find((c) => c.cause.includes("Grinding")).test.includes("overrunning clutch"));
+/* --- round 4 (Nov 25, 2026): check-engine-light tree, Figs. 62-64 --- */
+check("check-engine-light scope is in the title: 1998-1999 XL1200S only",
+  celTree.title.includes("1998–1999 XL1200S only"));
+check("check-engine-light step 1 states the 1200S-only scope in its note",
+  celTree.steps[0].note.includes("1200S on-board diagnostic system") && celTree.steps[0].note.includes("no lamp to diagnose"));
+check("check-engine-light is not year-gated and not in the wizard areas (hard 1200S gate, dealer-ended tree)",
+  require("./gating.js").GATED_TREES.indexOf("check-engine-light") === -1 &&
+  require("./wizard.js").AREAS.electrical.indexOf("check-engine-light") === -1);
+check("check-engine-light: no critical-urgency cause, so it sorts last under roadside urgency on its own",
+  !celTree.causes.some((c) => c.urgency === "critical"));
+check("check-engine-light: stuck-on step routes to Fig. 64, no-lamp steps to Figs. 62-63",
+  celTree.steps[0].cite.includes("Fig. 64") && celTree.steps[3].cite.includes("Fig. 62") && celTree.steps[3].cite.includes("Fig. 63"));
+check("check-engine-light: Pin 4 jumper on the black Fig. 44 test harness, 1999 repeat named",
+  celTree.steps[3].q.includes("Pin 4") && celTree.steps[3].q.includes("Fig. 44") &&
+  celTree.causes.find((c) => c.cause.includes("Ignition module failed")).test.includes("repeat the jumper"));
+check("check-engine-light: Fig. 63 swapped Fig. 65/66 cross-references flagged, tree follows the chart titles",
+  celTree.steps[2].note.includes("swapped") && celTree.steps[2].note.includes("Fig. 65 is the no-spark") &&
+  celTree.causes.find((c) => c.cause.includes("won't start too")).test.includes("12 ± 1 V"));
+check("check-engine-light: 1998 lamp is the tachometer (not replaceable), 1999 is the speedometer LED",
+  celTree.causes.find((c) => c.cause.includes("Lamp / LED itself failed")).fix.includes("replace the faulty tachometer") &&
+  celTree.causes.find((c) => c.cause.includes("Lamp / LED itself failed")).fix.includes("replace the speedometer if the LED has failed"));
+check("check-engine-light: every replacement outcome says confirm at a dealership — Scanalyzer",
+  celTree.causes.filter((c) => c.fix.toLowerCase().includes("replace")).every((c) => c.fix.includes("Scanalyzer")) &&
+  celTree.causes.find((c) => c.cause.includes("stuck on")).fix.includes("Scanalyzer"));
+check("check-engine-light: stuck-on cause carries the full Fig. 64 walk (4-second check, module disconnect, 1998/1999 short tests)",
+  celTree.causes.find((c) => c.cause.includes("stuck on")).test.includes("4-second lamp-on period") &&
+  celTree.causes.find((c) => c.cause.includes("stuck on")).test.includes("disconnect the ignition module black connector [10]") &&
+  celTree.causes.find((c) => c.cause.includes("stuck on")).test.includes("1998 models") &&
+  celTree.causes.find((c) => c.cause.includes("stuck on")).test.includes("1999 models"));
+check("check-engine-light: module cause carries the ignition-module part key (no invented part)",
+  celTree.causes.find((c) => c.cause.includes("Ignition module failed")).part === "ignition-module");
 const sportsterChapter = D.torque.chapters.find((c) => c.title.startsWith("Sportster"));
 check("Sportster torque chapter present", !!sportsterChapter);
 eq("Sportster torque chapter has 2 rows", sportsterChapter.slugs.length, 2);
@@ -944,11 +989,14 @@ check("finishTree clears the question buttons", appjs.includes("$(\"tree-step\")
 /* --- wave 3 (Nov 25, 2026): + belt, clutch, primary chain, storage = 17 cards --- */
 /* --- wave 4 (Nov 25, 2026): + brake pads, fork oil, first 500-mile service = 20 cards --- */
 /* --- wave 5 (Nov 25, 2026): + engine oil, transmission oil, primary oil, brake fluid flush = 24 cards --- */
+/* --- wave 6 (Nov 25, 2026): + CV carb rebuild = 25 cards --- */
+/* --- wave 7 (Nov 25, 2026, v24): + front wheel, rear wheel, brake disc, fork seal, steering head, clutch cable, wheel bearing = 32 cards --- */
+/* --- wave 8 (Nov 25, 2026, v25): + clutch friction plates = 33 cards --- */
 const SH = require("./shop.js");
 check("index.html has the Shop tab", html.includes('data-tab="shop"') && html.includes('id="panel-shop"'));
-["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride", "tire-reader", "unit-converter", "belt-adjust", "clutch-adjust", "primary-chain", "storage", "brake-pads", "fork-oil", "first-500", "engine-oil", "transmission-oil", "primary-oil", "brake-fluid-flush"].forEach((id) =>
+["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride", "tire-reader", "unit-converter", "belt-adjust", "clutch-adjust", "primary-chain", "storage", "brake-pads", "fork-oil", "first-500", "engine-oil", "transmission-oil", "primary-oil", "brake-fluid-flush", "carb-rebuild", "front-wheel", "rear-wheel", "brake-disc", "fork-seal", "steering-head", "clutch-cable", "wheel-bearing", "clutch-plates"].forEach((id) =>
   check("index.html has the " + id + " card", html.includes('id="' + id + '"')));
-check("app.js renders all 24 shop cards", ["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride", "tire-reader", "unit-converter", "belt-adjust", "clutch-adjust", "primary-chain", "storage", "brake-pads", "fork-oil", "first-500", "engine-oil", "transmission-oil", "primary-oil", "brake-fluid-flush"].every((id) => appjs.includes("$(\"" + id + "\")")));
+check("app.js renders all 33 shop cards", ["plug-reader", "wire-fuse", "gear-ratio", "tap-drill", "bolt-id", "oil-viscosity", "compression-ratio", "carb-cfm", "sag-setter", "parts-interchange", "pre-ride", "tire-reader", "unit-converter", "belt-adjust", "clutch-adjust", "primary-chain", "storage", "brake-pads", "fork-oil", "first-500", "engine-oil", "transmission-oil", "primary-oil", "brake-fluid-flush", "carb-rebuild", "front-wheel", "rear-wheel", "brake-disc", "fork-seal", "steering-head", "clutch-cable", "wheel-bearing", "clutch-plates"].every((id) => appjs.includes("$(\"" + id + "\")")));
 check("index.html loads shop.js before app.js", html.indexOf('src="shop.js"') > 0 && html.indexOf('src="shop.js"') < html.indexOf('src="app.js"'));
 
 /* plug reader: 9 conditions from Repair Manual Ch. 3 p. 112 */
@@ -1649,6 +1697,124 @@ check("app.js renders the carb rebuild card",
 check("index.html has the carb rebuild card + Shop intro lists it",
   html.includes('id="carb-rebuild"') && html.includes("CV carburetor rebuild"));
 
+/* --- round 4 batch (Nov 25, 2026, v24): seven Shop procedure cards ---
+   FSM #99482-98 §2, verified from the raw FSM text before wiring:
+   front wheel pp. 2-4–2-7, rear wheel pp. 2-15–2-17, brake disc
+   pp. 2-4–2-6 (front) + p. 2-16 (rear), fork seal pp. 2-51–2-54,
+   steering head p. 2-54 + pp. 2-67–2-69, clutch cable p. 2-75,
+   wheel bearings §1 p. 1-41 + the §2 wheel sections. Every torque,
+   caution and part number below is a printed figure; the two places
+   the manual prints conflicting figures are flagged on the cards,
+   not reconciled. */
+const fw = D.shop.front_wheel;
+check("front wheel card exists, cites §2 pp. 2-4–2-7", !!fw && fw.ref.includes("§2") && fw.ref.includes("2-4") && fw.ref.includes("2-7"));
+check("front wheel torques axle nut 50 ft-lbs, slider caps 9-13, caliper bolts 25-30",
+  fw.installation.some((s) => s.includes("50 ft-lbs")) && fw.installation.some((s) => s.includes("9-13 ft-lbs")) &&
+  fw.installation.some((s) => s.includes("25-30 ft-lbs")));
+check("front wheel flags the printed Nm mismatch (9-13 ft-lbs vs 7-15 Nm)",
+  fw.torque_flag.includes("7-15 Nm") && fw.torque_flag.includes("follow the ft-lb figure"));
+check("front wheel end play 0.002 to 0.006 in, set by the shim pack, must not be altered",
+  fw.end_play.includes("0.002 to 0.006") && fw.end_play.includes("must not be altered") &&
+  fw.end_play_warning.includes("handling problem"));
+const rw = D.shop.rear_wheel;
+check("rear wheel card exists, cites §2 pp. 2-15–2-17", !!rw && rw.ref.includes("2-15") && rw.ref.includes("2-17"));
+check("rear wheel torques the axle nut 60-65 ft-lbs and fits a new cotter pin or spring clip",
+  rw.installation.some((s) => s.includes("60-65 ft-lbs")) && rw.installation.some((s) => s.includes("new cotter pin or spring clip")));
+check("rear wheel end play 0.002 to 0.006 in and the belt card follows it",
+  rw.end_play.includes("0.002 to 0.006") && rw.belt_note.includes("Belt adjustment itself is on the belt card"));
+const bd = D.shop.brake_disc;
+check("brake disc card exists, cites §2 pp. 2-4–2-6 and p. 2-16", !!bd && bd.ref.includes("2-4") && bd.ref.includes("2-16"));
+check("brake disc front T-40 screws 16-24 ft-lbs, rear T-45 screws 30-45 ft-lbs",
+  bd.front_assembly.includes("16-24 ft-lbs") && bd.rear_assembly.includes("30-45 ft-lbs") &&
+  bd.front_removal.includes("T-40") && bd.rear_assembly.includes("T-45"));
+check("brake disc replace criterion is the printed one (warped / scored / beyond stamped minimum)",
+  bd.replace_criterion.includes("warped") && bd.replace_criterion.includes("minimum thickness stamped on the disc"));
+const fseal = D.shop.fork_seal;
+check("fork seal card exists, cites §2 pp. 2-51–2-54", !!fseal && fseal.ref.includes("2-51") && fseal.ref.includes("2-54"));
+check("fork seal installs with HD-34634, spacer flange up, lettered side of the seal up",
+  fseal.assembly.some((s) => s.includes("HD-34634")) && fseal.assembly.some((s) => s.includes("lettered side of the seal is facing upward")));
+check("fork seal torques the pinch bolts 23-28 ft-lbs and says §2 prints no plug torque",
+  fseal.installation.some((s) => s.includes("23-28 ft-lbs")) && fseal.torque_note.includes("prints no torque for the fork tube plug"));
+const sh = D.shop.steering_head;
+check("steering head card exists, cites §2 p. 2-54 and pp. 2-67–2-69", !!sh && sh.ref.includes("2-54") && sh.ref.includes("2-67"));
+check("steering head fall-away is 1-2 inches, pinch bolts 30-35 ft-lbs, stem pinch 21-27 ft-lbs",
+  sh.fallaway_spec.includes("1-2 inches") && sh.fallaway.some((s) => s.includes("30 to 35 ft-lbs")) &&
+  sh.installation_flstc.some((s) => s.includes("21-27 ft-lbs")));
+check("steering head warns races out means bearings cannot be reused",
+  sh.race_note.includes("cannot be reused") && sh.race_removal.includes("HD-39301A"));
+const cc = D.shop.clutch_cable;
+check("clutch cable card exists, cites §2 p. 2-75", !!cc && cc.ref.includes("2-75"));
+check("clutch cable fitting torques 3-5 ft-lbs and the ramp comes out before the cable end is disconnected",
+  cc.installation.some((s) => s.includes("3-5 ft-lbs")) && cc.removal.some((s) => s.includes("inner ramp and coupling")));
+const wb = D.shop.wheel_bearing;
+check("wheel bearing card exists, cites §1 p. 1-41", !!wb && wb.ref.includes("1-41"));
+check("wheel bearing interval is every 10,000 miles or prior to storage, grease is H-0 99855-89",
+  wb.interval.includes("10,000") && wb.grease.includes("99855-89"));
+check("wheel bearing seal depths cover front disc/laced and rear laced/cast, bearings + races replaced as a set",
+  wb.seal_depths.some((s) => s.includes("0.04")) && wb.seal_depths.some((s) => s.includes("0.260-0.280")) &&
+  wb.sets_note.includes("sets only"));
+check("app.js renders all seven new procedure cards",
+  appjs.includes("$(\"front-wheel\")") && appjs.includes("SH.front_wheel.removal") &&
+  appjs.includes("$(\"rear-wheel\")") && appjs.includes("SH.rear_wheel.installation") &&
+  appjs.includes("$(\"brake-disc\")") && appjs.includes("SH.brake_disc.front_assembly") &&
+  appjs.includes("$(\"fork-seal\")") && appjs.includes("SH.fork_seal.assembly") &&
+  appjs.includes("$(\"steering-head\")") && appjs.includes("SH.steering_head.fallaway") &&
+  appjs.includes("$(\"clutch-cable\")") && appjs.includes("SH.clutch_cable.installation") &&
+  appjs.includes("$(\"wheel-bearing\")") && appjs.includes("SH.wheel_bearing.seal_depths"));
+check("index.html has all seven new procedure cards",
+  ["front-wheel", "rear-wheel", "brake-disc", "fork-seal", "steering-head", "clutch-cable", "wheel-bearing", "clutch-plates"].every((id) => html.includes('id="' + id + '"')));
+
+/* --- deep-dig batch (Nov 25, 2026): clutch friction plates card + the
+   aftermarket-equivalents layer. Clutch card is FSM #99482-98 §6,
+   pp. 6-12–6-15 (1998 9-plate clutch), verified from the raw FSM text
+   before wiring. The equivalents layer is a separate table — never mixed
+   into OEM fitment — seeded with the EBC FA400 / 15-94 brake-pad
+   equivalent, verified in the Nov 21 interchange research against
+   BrakeCrafters, the HardDrive/EBC application table, and Drag
+   Specialties, with the factory P-20 condition carried on the row. */
+const cp = D.shop.clutch_plates;
+check("clutch plates card exists, cites §6 pp. 6-12–6-15 (1998 9-plate)",
+  !!cp && cp.ref.includes("§6") && cp.ref.includes("6-12") && cp.ref.includes("6-15"));
+check("clutch plates removal is the pack-only job: six bolts, damper spring and seat out with the plates",
+  cp.removal.length === 4 && cp.removal.some((s) => s.includes("six bolts")) &&
+  cp.removal.some((s) => s.includes("damper spring and damper spring seat")));
+check("clutch plates assembly alternates steel and friction, retainer bolts 90-110 in-lbs",
+  cp.assembly.some((s) => s.includes("90-110 in-lbs")) &&
+  cp.assembly.some((s) => s.includes("seven remaining sets")));
+check("clutch plates inspection: any plate under 0.143 in means a whole new set of nine",
+  cp.inspection.some((s) => s.includes("0.143 inch")) &&
+  cp.inspection.some((s) => s.includes("entirely new set")) &&
+  cp.inspection.some((s) => s.includes("all nine friction plates")));
+check("clutch plates inspection: steel warped more than 0.006 in is replaced, plates soak 5 minutes",
+  cp.inspection.some((s) => s.includes("0.006 inch")) &&
+  cp.inspection.some((s) => s.includes("at least 5 minutes")));
+check("clutch plates year split: 1997 is the 8-plate clutch, stack minimum 0.661 in, HD-38515A required",
+  cp.year_split.includes("8-plate") && cp.year_split.includes("0.661 in.") &&
+  cp.year_split.includes("HD-38515A") && cp.year_split.includes("9-plate"));
+check("app.js renders the clutch plates card",
+  appjs.includes("$(\"clutch-plates\")") && appjs.includes("SH.clutch_plates.removal") &&
+  appjs.includes("SH.clutch_plates.assembly") && appjs.includes("SH.clutch_plates.inspection") &&
+  appjs.includes("SH.clutch_plates.year_split"));
+const eqv = D.shop.equivalents;
+check("equivalents layer exists, seeded with one row",
+  !!eq && eqv.rows.length === 1);
+check("equivalents seed is EBC FA400 / 15-94 replacing OEM 44063-83A/C",
+  eqv.rows[0].part.includes("FA400") && eqv.rows[0].part.includes("15-94") &&
+  eqv.rows[0].part.includes("44063-83A/C"));
+check("equivalents seed fits Softail 1984–99 and carries the P-20 rotor condition",
+  eqv.rows[0].fits.includes("1984–99") &&
+  eqv.rows[0].note.includes("not factory fitment") &&
+  eqv.rows[0].note.includes("1992 stainless-steel rotors"));
+check("equivalents seed cites two independent sources (BrakeCrafters + HardDrive)",
+  eqv.rows[0].source.includes("BrakeCrafters") && eqv.rows[0].source.includes("HardDrive"));
+check("equivalents are kept out of the OEM interchange table",
+  !D.shop.interchange.rows.some((r) => r.part.includes("FA400") || r.part.includes("15-94")));
+check("app.js renders the equivalents table separately from interchange",
+  appjs.includes("$(\"parts-equivalents\")") && appjs.includes("SH.equivalents.rows") &&
+  appjs.includes("$(\"parts-interchange\")") && appjs.includes("SH.interchange.rows"));
+check("index.html has the equivalents table",
+  html.includes('id="parts-equivalents"'));
+
 /* --- round 3 (Nov 25, 2026): tree year-gating ---
    gating.js is pure: bikeYear parses the year out of the roster name,
    gateTreeText narrows the speedometer + turn-signal trees to the
@@ -1748,8 +1914,8 @@ check("wizard engine suggests the smoking tree", W.suggest("engine", "routine", 
 eq("wizard electrical suggests 4 trees", W.suggest("electrical", "routine", D.trees).length, 4);
 eq("wizard fuel suggests the two carb trees", W.suggest("fuel", "routine", D.trees).map((t) => t.id).join(","), "carb-lean-idle,carb-rich-flood");
 eq("wizard brakes suggests 1 tree", W.suggest("brakes", "routine", D.trees).length, 1);
-eq("wizard other suggests all 19 trees", W.suggest("other", "routine", D.trees).length, 19);
-eq("wizard unknown area suggests all trees (never empty)", W.suggest("nonsense", "routine", D.trees).length, 19);
+eq("wizard other suggests all 20 trees", W.suggest("other", "routine", D.trees).length, 20);
+eq("wizard unknown area suggests all trees (never empty)", W.suggest("nonsense", "routine", D.trees).length, 20);
 check("wizard roadside puts every critical-cause tree before every non-critical tree",
   (() => {
     const list = W.suggest("other", "roadside", D.trees);
@@ -1771,6 +1937,44 @@ check("app.js wires the wizard and starts the suggested tree with its context",
   appjs.includes("$(\"wiz-go\")") && appjs.includes("ED_Wizard.suggest") && appjs.includes("startTree(t, wizard)"));
 check("app.js still builds the full tree list directly (wizard never hides a tree)",
   appjs.includes("D.trees.forEach((t) => {") && appjs.includes("startTree(t)"));
+
+/* --- roadside mode (Nov 25, 2026, v24) ---
+   A refinement of the wizard, not a new capability: the same trees,
+   bigger buttons, roadside symptoms first. All three symptom buttons
+   open the existing no-start tree — its first two steps are the battery
+   and crank checks, and step 8 covers a bike that runs then dies, so
+   no separate won't-crank or died-while-riding tree exists or is
+   invented. The other roadside trees are charging, ignition-misfire
+   and brakes. The UI says all of this plainly. */
+check("roadside has exactly three symptoms and all three open the no-start tree",
+  W.ROADSIDE_SYMPTOMS.length === 3 &&
+  W.ROADSIDE_SYMPTOMS.map((s) => s.id).join(",") === "wont-crank,cranks-no-fire,died-while-riding" &&
+  W.ROADSIDE_SYMPTOMS.every((s) => s.tree === "no-start"));
+check("roadside first tree is the no-start tree and the other trees are charging, ignition-misfire, brakes",
+  W.roadside(D.trees).first.id === "no-start" &&
+  W.roadside(D.trees).others.map((t) => t.id).join(",") === "charging,ignition-misfire,brakes");
+check("roadside rest is every other tree, no tree lost or doubled",
+  W.roadside(D.trees).rest.length === D.trees.length - 4 &&
+  W.roadside(D.trees).rest.every((t) => ["no-start", "charging", "ignition-misfire", "brakes"].indexOf(t.id) === -1) &&
+  new Set([W.roadside(D.trees).first.id].concat(W.roadside(D.trees).others.map((t) => t.id), W.roadside(D.trees).rest.map((t) => t.id))).size === D.trees.length);
+check("roadside skips a missing tree id instead of inventing one",
+  W.roadside(D.trees.filter((t) => t.id !== "brakes")).others.length === 2 &&
+  W.roadside(D.trees.filter((t) => t.id !== "no-start")).first === null);
+check("no-start tree steps 1-2 are the battery/crank checks and step 8 covers runs-then-dies",
+  D.trees.find((t) => t.id === "no-start").steps[0].note.toLowerCase().includes("battery") &&
+  D.trees.find((t) => t.id === "no-start").steps[1].q.toLowerCase().includes("crank") &&
+  D.trees.find((t) => t.id === "no-start").steps[7].q.toLowerCase().includes("dies"));
+check("index.html has the roadside card + view + symptom containers + big-button style",
+  html.includes('id="roadside-card"') && html.includes('id="roadside-enter"') &&
+  html.includes('id="roadside-view"') && html.includes('id="roadside-symptoms"') &&
+  html.includes('id="roadside-others"') && html.includes('id="roadside-exit"') &&
+  html.includes('id="roadside-all"') && html.includes(".ed-roadside-btn"));
+check("roadside UI says it is the same wizard, not new diagnoses, and says why all three symptoms open one tree",
+  html.includes("it does not add new diagnoses") && html.includes("All three symptoms open the no-start tree"));
+check("app.js wires roadside enter/exit and starts the no-start tree from a symptom button",
+  appjs.includes("$(\"roadside-enter\")") && appjs.includes("$(\"roadside-exit\")") &&
+  appjs.includes("ED_Wizard.ROADSIDE_SYMPTOMS") && appjs.includes("ED_Wizard.roadside(D.trees).others") &&
+  appjs.includes("startTree(t, roadsideWizard)") && appjs.includes("renderResume()"));
 
 /* --- resumable trees --- */
 check("index.html has the resume banner + abandon button",

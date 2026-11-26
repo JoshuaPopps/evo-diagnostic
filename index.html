@@ -34,6 +34,8 @@
   .ed-note{color:#bbb;font-size:.92em}
   .ed-tree-btn{display:block;width:100%;text-align:left;padding:12px;margin:6px 0;border:1px solid #444;border-radius:8px;background:#141419;color:#eee;font:inherit;cursor:pointer}
   .ed-tree-btn:hover{border-color:var(--purple,#9d6bff)}
+  .ed-roadside-btn{display:block;width:100%;text-align:left;padding:18px;margin:10px 0;border:2px solid var(--purple,#9d6bff);border-radius:10px;background:#141419;color:#eee;font:inherit;cursor:pointer}
+  .ed-roadside-btn b{font-size:1.35em;display:block;margin-bottom:2px}
   select,input[type=text]{font:inherit;padding:9px;border-radius:8px;border:1px solid #555;background:#111;color:#eee;width:100%;box-sizing:border-box}
   label{display:block;margin:10px 0 4px;font-weight:600}
   .ed-meter{height:14px;background:#222;border-radius:7px;overflow:hidden}
@@ -113,6 +115,23 @@
       <p class="ed-note" id="resume-text"></p>
       <button class="ed-btn" id="resume-btn">Resume</button>
       <button class="ed-btn ghost" id="resume-discard">Discard it</button>
+    </div>
+    <div class="ed-card" id="roadside-card">
+      <h3>Roadside mode</h3>
+      <p class="ed-note">Stuck at the side of the road? Big buttons, no scrolling through the list. Roadside mode is the same wizard with bigger buttons and the roadside trees first — it does not add new diagnoses.</p>
+      <button class="ed-btn" id="roadside-enter">Roadside mode</button>
+    </div>
+    <div id="roadside-view" style="display:none">
+      <div class="ed-card">
+        <h3>Roadside mode</h3>
+        <p class="ed-note">Roadside mode is the same wizard with bigger buttons and the roadside trees first — it does not add new diagnoses. The trees below are the same trees in the Diagnose tab.</p>
+        <p class="ed-note">All three symptoms open the no-start tree — its first steps are the battery and crank checks, and step 8 covers a bike that runs then dies. Once the bike is dead, you are diagnosing a no-start either way.</p>
+        <div id="roadside-symptoms"></div>
+        <h4>Other roadside trees</h4>
+        <div id="roadside-others"></div>
+        <button class="ed-btn ghost" id="roadside-all">All trees</button>
+        <button class="ed-btn ghost" id="roadside-exit">Exit roadside mode</button>
+      </div>
     </div>
     <div id="tree-list"></div>
     <div id="session" style="display:none">
@@ -521,6 +540,11 @@
       <div id="parts-interchange"></div>
     </div>
     <div class="ed-card">
+      <h3>Aftermarket equivalents — not factory fitment</h3>
+      <p class="ed-note">Parts other makers sell as replacements for an OEM number. These are retailer fitment claims, each verified against at least two independent sources — never factory fitment, and never mixed into the OEM interchange table above. Verify against the fiche before you buy.</p>
+      <div id="parts-equivalents"></div>
+    </div>
+    <div class="ed-card">
       <h3>Pre-ride check — T-CLOCS, Evo checks</h3>
       <p class="ed-note">The checks are Clymer Ch. 3 (Evo) and Sportster Ch. 3, grouped under the MSF T-CLOCS headings. Tick them off before every ride — the list is the same every time, that is the point.</p>
       <div id="pre-ride"></div>
@@ -594,6 +618,46 @@
       <h3>CV carburetor rebuild — remove, strip, inspect, reassemble</h3>
       <p class="ed-note">FSM #99482-98 §4, pp. 4-14&ndash;4-18: removal, installation (manifold capscrews 15&ndash;17 ft-lbs), disassembly of the vacuum piston chamber and carburetor body, cleaning and inspection, float replacement, and assembly. The task asked for removal / installation / disassembly only — assembly and cleaning are wired too, from the same pages, because a rebuild card that only takes the carb apart and never puts it back together is a trap. Part numbers in parentheses are Figure 4-12 callouts.</p>
       <div id="carb-rebuild"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Front wheel removal — hydraulic forks</h3>
+      <p class="ed-note">FSM #99482-98 §2, pp. 2-4&ndash;2-7. Axle nut 50 ft-lbs, slider cap nuts 9&ndash;13 ft-lbs, caliper bolts 25&ndash;30 ft-lbs. End play 0.002&ndash;0.006 in, set by the shim pack and never altered. The manual prints a Nm range for the cap nuts that does not convert from the ft-lb range — the card flags it.</p>
+      <div id="front-wheel"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Rear wheel removal</h3>
+      <p class="ed-note">FSM #99482-98 §2, pp. 2-15&ndash;2-17. Axle nut 60&ndash;65 ft-lbs (same as the belt card: 60, align the slots, never over 65), new cotter pin or spring clip, end play 0.002&ndash;0.006 in. Belt adjustment is on the belt card — this card ends with it.</p>
+      <div id="rear-wheel"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Brake disc replacement — front &amp; rear</h3>
+      <p class="ed-note">FSM #99482-98 §2, pp. 2-4&ndash;2-6 (front) and p. 2-16 (rear). The manual has no standalone disc procedure — the disc comes off during wheel disassembly, so this card collects the disc steps. Replace if warped, badly scored, or worn beyond the minimum thickness stamped on the disc. Front screws 16&ndash;24 ft-lbs, rear T-45 screws 30&ndash;45 ft-lbs.</p>
+      <div id="brake-disc"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Fork seal replacement — hydraulic forks</h3>
+      <p class="ed-note">FSM #99482-98 §2, pp. 2-51&ndash;2-54. The seal comes out with the upper bushing in a slide-hammer pull and goes back in with tool HD-34634 — spacer flanged side up, lettered side of the seal up. Pinch bolts 23&ndash;28 ft-lbs. §2 prints no torque for the fork tube plug; the 40&ndash;60 ft-lb cap figure is on the fork-oil card.</p>
+      <div id="fork-seal"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Steering head bearing adjustment — fall-away</h3>
+      <p class="ed-note">FSM #99482-98 §2, p. 2-54 (fall-away) and pp. 2-67&ndash;2-69 (removal, disassembly, assembly). Fall-away must be 1&ndash;2 inches. Lower triple clamp pinch bolts 30&ndash;35 ft-lbs; stem pinch bolt 21&ndash;27 ft-lbs. If the races come out, the bearings cannot be reused — replace them.</p>
+      <div id="steering-head"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Clutch cable replacement</h3>
+      <p class="ed-note">FSM #99482-98 §2, p. 2-75. Fitting into the side cover 3&ndash;5 ft-lbs. The inner ramp and coupling come out of the side cover before the cable end is disconnected, or the cable is damaged. Routing is by model — across the front of the bars on some, behind on others. Finish with the clutch adjustment (Section 1).</p>
+      <div id="clutch-cable"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Wheel bearing replacement — remove, inspect, repack</h3>
+      <p class="ed-note">FSM #99482-98 §1, p. 1-41 and §2 wheel sections. Every 10,000 miles or prior to storage. Races out with tool HD-33071; pack the cones with H-0 grease 99855-89; bearings and races always replaced as a set; never spin-dry a bearing with compressed air. Seal depths differ front and rear, laced and cast — all four are on the card.</p>
+      <div id="wheel-bearing"></div>
+    </div>
+    <div class="ed-card">
+      <h3>Clutch friction plates — 1998 9-plate pack</h3>
+      <p class="ed-note">FSM #99482-98 §6, pp. 6-12&ndash;6-15. The pack alone comes out on the motorcycle — six bolts hold the diaphragm spring retainer, no compressing tool. Any plate under 0.143 in means a whole new set of nine; retainer bolts 90&ndash;110 in-lbs. 1997 models run the earlier 8-plate clutch and are different — the card says how.</p>
+      <div id="clutch-plates"></div>
     </div>
   </section>
 

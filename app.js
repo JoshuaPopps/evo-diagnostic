@@ -135,6 +135,41 @@
     $("wiz-results").scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
 
+  /* ---------- roadside mode (v24): same trees, big buttons, roadside
+     symptoms first. A refinement of the wizard, not a new capability —
+     the symptom buttons open the existing no-start tree, the other
+     buttons open existing trees, and nothing new is diagnosed here. */
+  const roadsideWizard = { area: "electrical", when: "always", urgency: "roadside" };
+  function enterRoadside() {
+    $("wizard-card").style.display = "none";
+    $("resume-banner").style.display = "none";
+    $("tree-list").style.display = "none";
+    $("roadside-symptoms").innerHTML = ED_Wizard.ROADSIDE_SYMPTOMS.map((s) =>
+      "<button class='ed-roadside-btn' data-roadside='" + s.id + "'><b>" + s.label + "</b><span class='ed-note'>" + s.sub + "</span></button>").join("");
+    $("roadside-others").innerHTML = ED_Wizard.roadside(D.trees).others.map((t) =>
+      "<button class='ed-tree-btn' data-roadside-tree='" + t.id + "'><b>" + t.title + "</b><br><span class='ed-note'>" + t.system + "</span></button>").join("");
+    $("roadside-symptoms").querySelectorAll("[data-roadside]").forEach((btn) => btn.addEventListener("click", () => {
+      const s = ED_Wizard.ROADSIDE_SYMPTOMS.find((x) => x.id === btn.dataset.roadside);
+      const t = s && D.trees.find((x) => x.id === s.tree);
+      if (t) startTree(t, roadsideWizard);
+    }));
+    $("roadside-others").querySelectorAll("[data-roadside-tree]").forEach((btn) => btn.addEventListener("click", () => {
+      const t = D.trees.find((x) => x.id === btn.dataset.roadsideTree);
+      if (t) startTree(t, roadsideWizard);
+    }));
+    $("roadside-view").style.display = "block";
+    $("roadside-view").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  function exitRoadside() {
+    $("roadside-view").style.display = "none";
+    $("wizard-card").style.display = "block";
+    $("tree-list").style.display = "block";
+    renderResume();
+  }
+  $("roadside-enter").addEventListener("click", enterRoadside);
+  $("roadside-exit").addEventListener("click", exitRoadside);
+  $("roadside-all").addEventListener("click", exitRoadside);
+
   let current = null; // {tree, step, weights, answers, wizard}
   function startTree(t, wizard) {
     current = { tree: t, step: 0, weights: {}, answers: [], wizard: wizard || null };
@@ -944,6 +979,12 @@
       "<br>" + r.note +
       "<br><span class='ed-note'>Source: " + r.source + "</span></div>").join("") +
     "<p class='ed-note'>Source: " + SH.interchange.ref + "</p>";
+  /* 10b. Aftermarket equivalents — separate table, never mixed into OEM fitment */
+  $("parts-equivalents").innerHTML =
+    SH.equivalents.rows.map((r) => "<div class='ed-cause'><b>" + r.part + "</b> — " + r.fits +
+      "<br>" + r.note +
+      "<br><span class='ed-note'>Source: " + r.source + "</span></div>").join("") +
+    "<p class='ed-note'>Source: " + SH.equivalents.ref + "</p>";
   /* 11. Pre-ride check */
   $("pre-ride").innerHTML =
     "<p class='ed-note'>" + SH.preride.structure_note + "</p>" +
@@ -1183,6 +1224,115 @@
     "<h4>Assembly — accelerator pump, p. 4-18</h4>" +
     "<ol>" + SH.carb_rebuild.assembly_accel_pump.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
     "<p class='ed-note'>Source: " + SH.carb_rebuild.ref + "</p>";
+
+  /* 26. Front wheel removal — FSM §2 pp. 2-4–2-7 (hydraulic forks) */
+  $("front-wheel").innerHTML =
+    safetyHtml() +
+    "<p class='ed-note'>" + SH.front_wheel.note + "</p>" +
+    "<h4>Removal — p. 2-4</h4>" +
+    "<ol>" + SH.front_wheel.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Note:</b> " + SH.front_wheel.lever_note + "</p>" +
+    "<h4>Installation — p. 2-7</h4>" +
+    "<ol>" + SH.front_wheel.installation.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p><b>Wheel bearing end play:</b> " + SH.front_wheel.end_play + "</p>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.front_wheel.end_play_warning + "</p>" +
+    "<p class='ed-note'><b>Torque figure flag:</b> " + SH.front_wheel.torque_flag + "</p>" +
+    "<p class='ed-note'>Source: " + SH.front_wheel.ref + "</p>";
+  /* 27. Rear wheel removal — FSM §2 pp. 2-15–2-17 */
+  $("rear-wheel").innerHTML =
+    safetyHtml() +
+    "<h4>Removal — p. 2-15</h4>" +
+    "<ol>" + SH.rear_wheel.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Installation — p. 2-17</h4>" +
+    "<ol>" + SH.rear_wheel.installation.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p><b>Wheel bearing end play:</b> " + SH.rear_wheel.end_play + "</p>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.rear_wheel.end_play_warning + "</p>" +
+    "<p class='ed-note'>" + SH.rear_wheel.belt_note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.rear_wheel.ref + "</p>";
+  /* 28. Brake disc replacement — FSM §2 pp. 2-4–2-6 (front), p. 2-16 (rear) */
+  $("brake-disc").innerHTML =
+    safetyHtml() +
+    "<p class='ed-note'>" + SH.brake_disc.note + "</p>" +
+    "<p><b>Replace when:</b> " + SH.brake_disc.replace_criterion + "</p>" +
+    "<h4>Front disc</h4>" +
+    "<p>" + SH.brake_disc.front_removal + "</p>" +
+    "<p>" + SH.brake_disc.front_assembly + "</p>" +
+    "<h4>Rear disc</h4>" +
+    "<p>" + SH.brake_disc.rear_removal + "</p>" +
+    "<p>" + SH.brake_disc.rear_assembly + "</p>" +
+    "<p class='ed-note'>Source: " + SH.brake_disc.ref + "</p>";
+  /* 29. Fork seal replacement — FSM §2 pp. 2-51–2-54 (hydraulic forks) */
+  $("fork-seal").innerHTML =
+    safetyHtml() +
+    SH.fork_seal.warnings.map((w) => "<p class='ed-note'><b>Warning:</b> " + w + "</p>").join("") +
+    "<h4>Removal — p. 2-51</h4>" +
+    "<ol>" + SH.fork_seal.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Disassembly — pp. 2-51–2-52</h4>" +
+    "<ol>" + SH.fork_seal.disassembly.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Cleaning and inspection — p. 2-52</h4>" +
+    "<ol>" + SH.fork_seal.inspection.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Assembly — p. 2-54</h4>" +
+    "<ol>" + SH.fork_seal.assembly.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Installation — p. 2-54</h4>" +
+    "<ol>" + SH.fork_seal.installation.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Torque note:</b> " + SH.fork_seal.torque_note + "</p>" +
+    "<p class='ed-note'>Source: " + SH.fork_seal.ref + "</p>";
+  /* 30. Steering head bearing adjustment — FSM §2 p. 2-54 (fall-away), pp. 2-67–2-69 */
+  $("steering-head").innerHTML =
+    safetyHtml() +
+    "<p><b>Spec:</b> " + SH.steering_head.fallaway_spec + "</p>" +
+    "<h4>Adjustment — the fall-away method, p. 2-54</h4>" +
+    "<ol>" + SH.steering_head.fallaway.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Removal / disassembly — pp. 2-67–2-68</h4>" +
+    "<ol>" + SH.steering_head.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>" + SH.steering_head.race_note + "</p>" +
+    "<p><b>Lower bearings off the fork stem:</b> " + SH.steering_head.lower_bearing + "</p>" +
+    "<p><b>Race removal from the frame neck:</b> " + SH.steering_head.race_removal + "</p>" +
+    "<h4>Cleaning and inspection — p. 2-68</h4>" +
+    "<ol>" + SH.steering_head.inspection.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Assembly — p. 2-69</h4>" +
+    "<ol>" + SH.steering_head.assembly.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.steering_head.race_warning + "</p>" +
+    "<h4>Installation — FLSTC, FLSTF, p. 2-69</h4>" +
+    "<ol>" + SH.steering_head.installation_flstc.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Warning:</b> " + SH.steering_head.stem_warning + "</p>" +
+    "<p class='ed-note'>" + SH.steering_head.interval + "</p>" +
+    "<p class='ed-note'>Source: " + SH.steering_head.ref + "</p>";
+  /* 31. Clutch cable replacement — FSM §2 p. 2-75 */
+  $("clutch-cable").innerHTML =
+    safetyHtml() +
+    "<p><b>Replace when:</b> " + SH.clutch_cable.replace_when + "</p>" +
+    "<h4>Removal — p. 2-75</h4>" +
+    "<ol>" + SH.clutch_cable.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Installation — p. 2-75</h4>" +
+    "<ol>" + SH.clutch_cable.installation.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'>Source: " + SH.clutch_cable.ref + "</p>";
+  /* 32. Wheel bearing replacement — FSM §1 p. 1-41; §2 pp. 2-4–2-7, 2-15–2-17 */
+  $("wheel-bearing").innerHTML =
+    safetyHtml() +
+    "<p><b>When:</b> " + SH.wheel_bearing.interval + "</p>" +
+    "<ol>" + SH.wheel_bearing.steps.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p><b>Races:</b> " + SH.wheel_bearing.race_tool + "</p>" +
+    "<p><b>Grease:</b> " + SH.wheel_bearing.grease + "</p>" +
+    "<h4>Oil seal depths</h4>" +
+    "<ol>" + SH.wheel_bearing.seal_depths.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>Caution:</b> " + SH.wheel_bearing.spacer_caution + "</p>" +
+    "<p class='ed-note'>" + SH.wheel_bearing.sets_note + "</p>" +
+    "<p class='ed-note'>" + SH.wheel_bearing.end_play + "</p>" +
+    "<p class='ed-note'>Source: " + SH.wheel_bearing.ref + "</p>";
+
+  /* 33. Clutch friction plates — FSM §6 pp. 6-12–6-15 (1998 9-plate clutch) */
+  $("clutch-plates").innerHTML =
+    safetyHtml() +
+    "<p class='ed-note'>" + SH.clutch_plates.note + "</p>" +
+    "<h4>Partial disassembly — clutch pack only, p. 6-12</h4>" +
+    "<ol>" + SH.clutch_plates.removal.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Cleaning and inspection — p. 6-12</h4>" +
+    "<ol>" + SH.clutch_plates.inspection.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<h4>Assembly — clutch pack only, pp. 6-12–6-15</h4>" +
+    "<ol>" + SH.clutch_plates.assembly.map((s) => "<li>" + s + "</li>").join("") + "</ol>" +
+    "<p class='ed-note'><b>1997 models are different:</b> " + SH.clutch_plates.year_split + "</p>" +
+    "<p class='ed-note'>Source: " + SH.clutch_plates.ref + "</p>";
 
   /* ---------- VIN (pure decode lives in vin.js, tested in test.js) ---------- */
   $("vin-decode").addEventListener("click", () => {

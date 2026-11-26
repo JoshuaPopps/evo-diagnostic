@@ -15,14 +15,18 @@ test are what decide.
 
 ## What it does
 
-- **Diagnose tab** — 19 guided trees across starting, charging,
+- **Diagnose tab** — 20 guided trees across starting, charging,
   ignition, carb/fuel, engine noise, oil leaks, brakes, clutch,
   primary/drive, transmission, wheels/tires, lights, and smoking/oil
   consumption. Each tree asks yes/no questions from the factory
   manuals, then shows ranked causes (144 total) with a confidence
   score, urgency, a safe-to-ride verdict, the confirming test, and the
   fix. Every cause cites its source. Magazine tips are labeled
-  "NOT an FSM cause" — never presented as factory spec.
+  "NOT an FSM cause" — never presented as factory spec. Roadside mode
+  (v24): the same wizard with bigger buttons and the roadside trees
+  first — won't crank / cranks but won't fire / died while riding all
+  open the existing no-start tree, plus charging, ignition-misfire and
+  brakes. It adds no new diagnoses.
 - **Atlas tab** — tap-to-identify parts atlas: 41 parts on traced
   diagrams of the engine, primary, charging, and brake systems, with
   part numbers only where published. No invented part numbers.
@@ -56,7 +60,7 @@ test are what decide.
   Also carries the Knucklehead tire pressures from the 1940–47 Service
   Manual p. 3 (no Knucklehead torque values exist in that manual, so
   none appear).
-- **Shop tab** — 20 garage reference cards: spark-plug reader (9
+- **Shop tab** — 33 garage reference cards: spark-plug reader (9
   conditions with look/cause/action), wire gauge and breaker sizes,
   gear-ratio calculator, tap & drill chart, bolt identifier, oil
   viscosity guide, compression-ratio calculator, carb CFM calculator,
@@ -66,8 +70,19 @@ test are what decide.
   pp. 1-38–1-39), storage / winterize (FSM §1 p. 1-8), brake pad
   replacement (FSM §2 pp. 2-40–2-43, 2-47–2-48), fork oil change
   (FSM §1 p. 1-42), first 500-mile service (FSM §1 p. 1-1; Scheduled
-  Service Table pp. 1-34–1-37), and a pre-ride
-  (T-CLOCS) checklist.
+  Service Table pp. 1-34–1-37), engine oil change (FSM §1 p. 1-34),
+  transmission oil change (FSM §1 p. 1-34), primary oil change
+  (FSM §1 p. 1-34), brake fluid flush (FSM §1 p. 1-34), CV carburetor
+  rebuild (FSM §4 pp. 4-14–4-18), front wheel removal (FSM §2
+  pp. 2-4–2-7), rear wheel removal (FSM §2 pp. 2-15–2-17), brake disc
+  replacement (FSM §2 pp. 2-4–2-6, p. 2-16), fork seal replacement
+  (FSM §2 pp. 2-51–2-54), steering head bearing adjustment (FSM §2
+  p. 2-54, pp. 2-67–2-69), clutch cable replacement (FSM §2 p. 2-75),
+  wheel bearing replacement (FSM §1 p. 1-41), clutch friction plates
+  (FSM §6 pp. 6-12–6-15, 1998 9-plate pack), and a pre-ride
+  (T-CLOCS) checklist. The interchange lookup has a separate
+  aftermarket-equivalents table — retailer fitment claims, never mixed
+  into OEM fitment; seeded with EBC FA400 / 15-94 brake pads.
 - **Data tab** — export/import your bikes, sessions, and baselines as
   JSON. Hands off to the Carb Tune Journal and the Bike Maintenance
   Log from a finished diagnosis.
@@ -96,7 +111,7 @@ and works offline from the first visit.
 To test after editing the data or engine:
 
 ```bash
-node test.js            # 1629 tests, no dependencies
+node test.js            # 2297 tests, no dependencies
 ```
 
 ## Try it
@@ -225,7 +240,7 @@ price, or labor value. The rules it follows:
 | `tire.js` | Tire date-code and size reading |
 | `pg-parts-core.js` | Shared parts-core (part numbers, fitment) |
 | `data/nhtsa-evo-bundle.json` | Bundled NHTSA recalls / TSBs / complaints |
-| `test.js` | 1629 tests — `node test.js` |
+| `test.js` | 2297 tests — `node test.js` |
 | `styles.css` | 1990 Treatment styling (gloss black, chrome, purple), big touch targets |
 | `sw.js` / `sw-update.js` | Service worker + tap-to-update |
 | `manifest.json` | Install metadata (name, icons, colors) |
